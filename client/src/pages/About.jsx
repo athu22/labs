@@ -20,6 +20,49 @@ import member3 from '../assets/member3.png';
 import member4 from '../assets/member4.png';
 import member5 from '../assets/member5.png';
 
+// First Executive Committee images
+import fMember1 from '../assets/committee/member_1.jpeg';
+import fMember2 from '../assets/committee/member_2.jpeg';
+import fMember3 from '../assets/committee/member_3.jpeg';
+import fMember4 from '../assets/committee/member_4.jpeg';
+import fMember5 from '../assets/committee/member_5.jpeg';
+import fMember6 from '../assets/committee/member_6.jpeg';
+import fMember7 from '../assets/committee/member_7.jpeg';
+import fMember8 from '../assets/committee/member_8.jpeg';
+import fMember9 from '../assets/committee/member_9.jpeg';
+import fMember10 from '../assets/committee/member_10.jpeg';
+import fMember11 from '../assets/committee/member_11.jpeg';
+import fMember12 from '../assets/committee/member_12.jpeg';
+import fMember13 from '../assets/committee/member_13.jpeg';
+import fMember14 from '../assets/committee/member_14.jpeg';
+import fMember15 from '../assets/committee/member_15.jpeg';
+import fMember16 from '../assets/committee/member_16.jpeg';
+import fMember17 from '../assets/committee/member_17.jpeg';
+import fMember18 from '../assets/committee/member_18.jpeg';
+import fMember19 from '../assets/committee/member_19.jpeg';
+
+// Second Executive Committee images
+import sMember1 from '../assets/second_committee/face_1.jpeg';
+import sMember2 from '../assets/second_committee/face_2.jpeg';
+import sMember3 from '../assets/second_committee/face_3.jpeg';
+import sMember4 from '../assets/second_committee/face_4.jpeg';
+import sMember5 from '../assets/second_committee/face_5.jpeg';
+import sMember6 from '../assets/second_committee/face_6.jpeg';
+import sMember7 from '../assets/second_committee/face_7.jpeg';
+import sMember8 from '../assets/second_committee/face_8.jpeg';
+import sMember9 from '../assets/second_committee/face_9.jpeg';
+import sMember10 from '../assets/second_committee/face_10.jpeg';
+import sMember11 from '../assets/second_committee/face_11.jpeg';
+import sMember12 from '../assets/second_committee/face_12.jpeg';
+import sMember13 from '../assets/second_committee/face_13.jpeg';
+import sMember14 from '../assets/second_committee/face_14.jpeg';
+import sMember15 from '../assets/second_committee/face_15.jpeg';
+import sMember16 from '../assets/second_committee/face_16.jpeg';
+import sMember17 from '../assets/second_committee/face_17.jpeg';
+import sMember18 from '../assets/second_committee/face_18.jpeg';
+import sMember19 from '../assets/second_committee/face_19.jpeg';
+import sMember20 from '../assets/second_committee/face_20.jpeg';
+
 // Translations for About Page
 const translations = {
   en: {
@@ -44,8 +87,10 @@ const translations = {
     // Vision & Mission
     ourVision: 'Our Vision',
     ourMission: 'Our Mission',
-    visionDesc: 'To build a future where every laboratory professional is respected, empowered, and recognized as a vital pillar of healthcare. We aspire to advance excellence in laboratory science through quality, innovation, ethics, and lifelong learning.',
-    missionDesc: 'To empower laboratory professionals through excellence in education, innovation, and collaboration. We are committed to promoting quality diagnostics, ethical practice, and continuous professional development.',
+    visionDesc: 'Our vision is to build a future where every laboratory professional is respected, empowered, and recognized as a vital pillar of healthcare. We aspire to advance excellence in laboratory science through quality, innovation, ethics, and lifelong learning. Together, we aim to strengthen diagnostic services and create healthier communities.',
+    visionTagline: '“Shaping the Future of Laboratory Excellence.”',
+    missionDesc: 'Our mission is to empower laboratory professionals through excellence in education, innovation, and collaboration. We are committed to promoting quality diagnostics, ethical practice, and continuous professional development. By strengthening the laboratory profession, we strive to improve patient care and contribute to a healthier society.',
+    missionTagline: '“Empowering Professionals. Advancing Diagnostics. Serving Society.”',
     exploreVision: 'Explore Vision',
     discoverMission: 'Discover Mission',
     ourGoal: 'Our Goal',
@@ -79,8 +124,24 @@ const translations = {
     executiveBoardEnd: 'Executive Board',
     leadershipDesc: 'Visionary leaders committed to advancing clinical laboratory excellence',
 
+    // First Executive Committee
+    firstExecutiveBoard: 'First',
+    firstExecutiveBoardEnd: 'Executive Committee',
+    firstExecutiveBoardDesc: 'The visionary founders who laid the foundation of ACLAP',
+    secondExecutiveBoard: 'Second',
+    secondExecutiveBoardEnd: 'Executive Committee',
+    secondExecutiveBoardDesc: 'The visionary leaders who expanded the reach of ACLAP',
+    viewCommittee: 'View Committee',
+    hideCommittee: 'Hide Committee',
+
     // Achievements
     ourAchievements: 'Our Achievements',
+
+    // Why Join ACLAP
+    whyJoinAclap: 'Why Join ACLAP?',
+    whyJoinTaglineStart: 'Together We Protect.',
+    whyJoinTaglineEnd: 'Together We Progress.',
+    whyJoinDesc: 'ACLAP is Maharashtra’s trusted association dedicated to empowering Clinical Laboratory Analysts and Practitioners. We work collectively to protect professional rights, promote scientific excellence, and strengthen the future of laboratory professionals through unity, advocacy, and continuous development.',
 
     // Testimonials - Empty
     membersSay: 'What Our',
@@ -135,8 +196,10 @@ const translations = {
     // Vision & Mission
     ourVision: 'आमची दृष्टी',
     ourMission: 'आमचे ध्येय',
-    visionDesc: 'प्रत्येक प्रयोगशाळा व्यावसायिकाला सन्मान, सक्षम संधी आणि आरोग्य व्यवस्थेतील महत्त्वपूर्ण स्थान मिळावे, हीच आमची दृष्टी आहे. गुणवत्ता, विज्ञान, नवोपक्रम, नैतिकता आणि सातत्यपूर्ण शिक्षण यांच्या आधारावर प्रयोगशाळा क्षेत्रात उत्कृष्टतेची नवी उंची गाठणे हे आमचे ध्येय आहे.',
-    missionDesc: 'शिक्षण, नवोपक्रम आणि सहकार्य यांच्या माध्यमातून प्रयोगशाळा व्यावसायिकांना सक्षम करणे. गुणवत्तापूर्ण निदान सेवा, नैतिक व्यावसायिक आचरण आणि सातत्यपूर्ण कौशल्यविकासाला प्रोत्साहन देणे ही आमची बांधिलकी आहे.',
+    visionDesc: 'प्रत्येक प्रयोगशाळा व्यावसायिकाला सन्मान, सक्षम संधी आणि आरोग्य व्यवस्थेतील महत्त्वपूर्ण स्थान मिळावे, हीच आमची दृष्टी आहे. गुणवत्ता, विज्ञान, नवोपक्रम, नैतिकता आणि सातत्यपूर्ण शिक्षण यांच्या आधारावर प्रयोगशाळा क्षेत्रात उत्कृष्टतेची नवी उंची गाठणे हे आमचे ध्येय आहे. सक्षम निदान सेवा आणि निरोगी समाज घडविण्यासाठी आम्ही कटिबद्ध आहोत.',
+    visionTagline: '“उत्कृष्ट प्रयोगशाळा सेवांद्वारे निरोगी भविष्य घडविण्याचा संकल्प.”',
+    missionDesc: 'आमचे ध्येय म्हणजे शिक्षण, नवोपक्रम आणि सहकार्य यांच्या माध्यमातून प्रयोगशाळा व्यावसायिकांना सक्षम करणे. गुणवत्तापूर्ण निदान सेवा, नैतिक व्यावसायिक आचरण आणि सातत्यपूर्ण कौशल्यविकासाला प्रोत्साहन देणे ही आमची बांधिलकी आहे. सक्षम प्रयोगशाळा व्यवसायाच्या माध्यमातून उत्तम रुग्णसेवा आणि निरोगी समाज घडविण्यासाठी आम्ही कार्यरत आहोत.',
+    missionTagline: '“व्यावसायिकांचे सक्षमीकरण • गुणवत्तापूर्ण निदान • समाजसेवा”',
     exploreVision: 'दृष्टी पहा',
     discoverMission: 'ध्येय पहा',
     ourGoal: 'आमचे उद्दिष्ट',
@@ -170,8 +233,24 @@ const translations = {
     executiveBoardEnd: 'पदाधिकारी मंडळ',
     leadershipDesc: 'नैदानिक प्रयोगशाळा उत्कृष्टतेसाठी वचनबद्ध दूरदर्शी नेते',
 
+    // First Executive Committee
+    firstExecutiveBoard: 'पहिली',
+    firstExecutiveBoardEnd: 'कार्यकारिणी समिती',
+    firstExecutiveBoardDesc: 'ACLAP चा पाया रचणारे दूरदर्शी संस्थापक',
+    secondExecutiveBoard: 'दुसरी',
+    secondExecutiveBoardEnd: 'कार्यकारिणी समिती',
+    secondExecutiveBoardDesc: 'ACLAP ची व्याप्ती वाढवणारे दूरदर्शी नेते',
+    viewCommittee: 'समिती पहा',
+    hideCommittee: 'समिती लपवा',
+
     // Achievements
     ourAchievements: 'आमची उपलब्धी',
+
+    // Why Join ACLAP
+    whyJoinAclap: 'ACLAP मध्ये का सामील व्हावे?',
+    whyJoinTaglineStart: 'एकत्रितपणे आपण संरक्षण करतो.',
+    whyJoinTaglineEnd: 'एकत्रितपणे आपण प्रगती करतो.',
+    whyJoinDesc: 'ACLAP ही महाराष्ट्रातील एक विश्वसनीय संघटना आहे, जी क्लिनिकल लॅबोरेटरी विश्लेषक आणि अभ्यासकांना सक्षम करण्यासाठी समर्पित आहे. आम्ही व्यावसायिक अधिकारांचे रक्षण करण्यासाठी, वैज्ञानिक उत्कृष्टतेला प्रोत्साहन देण्यासाठी आणि एकता, वकिली आणि सतत विकासाच्या माध्यमातून प्रयोगशाळा व्यावसायिकांचे भविष्य अधिक बळकट करण्यासाठी एकत्रितपणे काम करतो.',
 
     // Testimonials - Empty
     membersSay: 'सदस्य काय',
@@ -213,6 +292,8 @@ const About = () => {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isFirstCommitteeVisible, setIsFirstCommitteeVisible] = useState(false);
+  const [isSecondCommitteeVisible, setIsSecondCommitteeVisible] = useState(false);
 
   // Empty testimonials array
   const testimonials = [];
@@ -310,6 +391,51 @@ const About = () => {
       position: 'Joint Secretary',
       image: member5,
     },
+  ];
+
+  const firstExecutiveCommittee = [
+    { name: 'Annasaheb Karole', position: 'President', image: fMember1 },
+    { name: 'Rajkumar Tiwatane', position: 'Secretary', image: fMember2 },
+    { name: 'Udaykumar Khairnar', position: 'Vice President', image: fMember3 },
+    { name: 'Raghunath Bhongale', position: 'Joint Secretary', image: fMember4 },
+    { name: 'Shivaji Kadam', position: 'Treasurer', image: fMember5 },
+    { name: 'Anil Rathi', position: 'Director', image: fMember6 },
+    { name: 'Shripad Karandikar', position: 'Director', image: fMember7 },
+    { name: 'Gautam Desai', position: 'Director', image: fMember8 },
+    { name: 'Dhanjay Dabir', position: 'Director', image: fMember9 },
+    { name: 'Rajesh Shetti', position: 'Director', image: fMember10 },
+    { name: 'Shakil Attar', position: 'Director', image: fMember11 },
+    { name: 'Varsha Zavar', position: 'Director', image: fMember12 },
+    { name: 'Nitin Salunkhe', position: 'Director', image: fMember13 },
+    { name: 'Girish Sharanathe', position: 'Director', image: fMember14 },
+    { name: 'Anil Gite', position: 'Zonal Secretary', image: fMember15 },
+    { name: 'Vilas Rasal', position: 'Zonal Secretary', image: fMember16 },
+    { name: 'Dhanjay Kulkarni', position: 'Zonal Secretary', image: fMember17 },
+    { name: 'Kumar Patil', position: 'Zonal Secretary', image: fMember18 },
+    { name: 'Janardhan Chopade', position: 'Zonal Secretary', image: fMember19 }
+  ];
+
+  const secondExecutiveCommittee = [
+    { name: 'Annasaheb Karole', position: 'President', image: sMember1 },
+    { name: 'Dhananjay Dabir', position: 'Vice President', image: sMember2 },
+    { name: 'Kumar Patil', position: 'Secretary', image: sMember3 },
+    { name: 'Raghunath Bhongale', position: 'Treasurer', image: sMember4 },
+    { name: 'Shripad Karandikar', position: 'Joint Secretary', image: sMember5 },
+    { name: 'Hemant Kumbhar', position: 'Zonal Secretary', image: sMember6 },
+    { name: 'Umeshchandra Sonar', position: 'Director (PMC President)', image: sMember7 },
+    { name: 'Nitin Solanke', position: 'Zonal Secretary', image: sMember8 },
+    { name: 'Ganesh Bondhare', position: 'Zonal Secretary', image: sMember9 },
+    { name: 'Dattatraya Apsingekar', position: 'Director', image: sMember10 },
+    { name: 'Prashant Gulekar', position: 'Director', image: sMember11 },
+    { name: 'Ram Krishna Borse', position: 'Director', image: sMember12 },
+    { name: 'Chandrakant Kotwade', position: 'Director', image: sMember13 },
+    { name: 'Pandit Jadhav', position: 'Director', image: sMember14 },
+    { name: 'Janardhan Chopade', position: 'Director', image: sMember15 },
+    { name: 'Mahadev Kolekar', position: 'Director', image: sMember16 },
+    { name: 'Deepak Kale', position: 'Director', image: sMember17 },
+    { name: 'Nikhil Late', position: 'Director', image: sMember18 },
+    { name: 'Rajesh Garud', position: 'Director', image: sMember19 },
+    { name: 'Varsha Zanvar', position: 'Director', image: sMember20 }
   ];
 
   useEffect(() => {
@@ -596,9 +722,14 @@ const About = () => {
                 </motion.div>
               </div>
               <h2 className="text-3xl md:text-4xl font-black text-slate-900 mb-6">{t.ourVision}</h2>
-              <p className="text-slate-500 text-lg leading-relaxed">
+              <p className="text-slate-500 text-lg leading-relaxed mb-6">
                 {t.visionDesc}
               </p>
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <p className="text-primary-600 text-md md:text-lg font-black text-center tracking-wide">
+                  {t.visionTagline}
+                </p>
+              </div>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 whileHover={{ opacity: 1, x: 0 }}
@@ -638,9 +769,14 @@ const About = () => {
                 </motion.div>
               </div>
               <h2 className="text-3xl md:text-4xl font-black text-white mb-6">{t.ourMission}</h2>
-              <p className="text-primary-100 text-lg leading-relaxed">
+              <p className="text-primary-100 text-lg leading-relaxed mb-6">
                 {t.missionDesc}
               </p>
+              <div className="bg-white/10 p-4 rounded-xl border border-white/20">
+                <p className="text-white text-md md:text-lg font-black text-center tracking-wide">
+                  {t.missionTagline}
+                </p>
+              </div>
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 whileHover={{ opacity: 1, x: 0 }}
@@ -919,10 +1055,10 @@ const About = () => {
                 viewport={{ once: true }}
                 variants={controls.scaleUp}
                 whileHover={{ y: -12 }}
-                className="group cursor-pointer"
+                className="group cursor-pointer h-full"
               >
-                <div className="bg-white rounded-2xl overflow-hidden shadow-xl border border-slate-100 hover:shadow-2xl transition-all relative">
-                  <div className="relative h-64 bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center overflow-hidden">
+                <div className="bg-white rounded-2xl overflow-hidden shadow-xl border border-slate-100 hover:shadow-2xl transition-all relative h-full flex flex-col">
+                  <div className="relative h-64 bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center overflow-hidden shrink-0">
                     <motion.div
                       whileHover={{ scale: 1.1 }}
                       className="w-full h-full flex items-center justify-center relative"
@@ -943,7 +1079,7 @@ const About = () => {
                     </motion.div>
                     <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white to-transparent" />
                   </div>
-                  <div className="p-6 text-center">
+                  <div className="p-6 text-center flex-grow flex flex-col justify-center">
                     <h3 className="text-xl font-black text-slate-800 mb-1">{leader.name}</h3>
                     <p className="text-primary-600 text-xs font-bold uppercase tracking-wider">{leader.position}</p>
                   </div>
@@ -957,6 +1093,242 @@ const About = () => {
                 </div>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* First Executive Committee Section */}
+      <section className="py-20 bg-slate-50 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-2 relative z-10">
+          <div className="text-center mb-16">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.scaleUp}
+              className="inline-flex items-center gap-2 bg-primary-100 px-4 py-2 rounded-full mb-4"
+            >
+              <Users size={14} className="text-primary-600" />
+              <span className="text-primary-700 text-xs font-black uppercase tracking-wider">{t.ourLeaders}</span>
+            </motion.div>
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.fadeInUp}
+              className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-4"
+            >
+              {t.firstExecutiveBoard} <span className="bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">{t.firstExecutiveBoardEnd}</span>
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.fadeInUp}
+              className="text-slate-500 text-lg max-w-2xl mx-auto"
+            >
+              {t.firstExecutiveBoardDesc}
+            </motion.p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-8">
+            {firstExecutiveCommittee.slice(0, 5).map((leader, i) => (
+              <motion.div
+                key={`first-5-${i}`}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={controls.scaleUp}
+                whileHover={{ y: -5 }}
+                className="group cursor-pointer h-full"
+              >
+                <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
+                  <img
+                    src={leader.image}
+                    alt={leader.name}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
+                  />
+                  <div className="flex-grow flex flex-col justify-center">
+                    <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
+                    <p className="text-primary-600 text-[10px] md:text-xs font-bold uppercase tracking-wider">{leader.position}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {isFirstCommitteeVisible && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 pb-8">
+                  {firstExecutiveCommittee.slice(5).map((leader, i) => (
+                    <motion.div
+                      key={`rest-${i}`}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -5 }}
+                      className="group cursor-pointer h-full"
+                    >
+                      <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
+                        <img
+                          src={leader.image}
+                          alt={leader.name}
+                          className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
+                        />
+                        <div className="flex-grow flex flex-col justify-center">
+                          <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
+                          <p className="text-primary-600 text-[10px] md:text-xs font-bold uppercase tracking-wider">{leader.position}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="text-center mt-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsFirstCommitteeVisible(!isFirstCommitteeVisible)}
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-primary-700 border-2 border-primary-200 font-black text-sm uppercase tracking-wider rounded-full shadow-lg hover:shadow-xl hover:bg-primary-50 transition-all"
+            >
+              {isFirstCommitteeVisible ? t.hideCommittee : t.viewCommittee}
+              <motion.div
+                animate={{ rotate: isFirstCommitteeVisible ? -90 : 90 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronRight size={18} />
+              </motion.div>
+            </motion.button>
+          </div>
+        </div>
+      </section>
+
+      {/* Second Executive Committee Section */}
+      <section className="py-20 bg-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-2 relative z-10">
+          <div className="text-center mb-16">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.scaleUp}
+              className="inline-flex items-center gap-2 bg-primary-100 px-4 py-2 rounded-full mb-4"
+            >
+              <Users size={14} className="text-primary-600" />
+              <span className="text-primary-700 text-xs font-black uppercase tracking-wider">{t.ourLeaders}</span>
+            </motion.div>
+            <motion.h2
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.fadeInUp}
+              className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-4"
+            >
+              {t.secondExecutiveBoard} <span className="bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent">{t.secondExecutiveBoardEnd}</span>
+            </motion.h2>
+            <motion.p
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={controls.fadeInUp}
+              className="text-slate-500 text-lg max-w-2xl mx-auto"
+            >
+              {t.secondExecutiveBoardDesc}
+            </motion.p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-8">
+            {secondExecutiveCommittee.slice(0, 5).map((leader, i) => (
+              <motion.div
+                key={`second-5-${i}`}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                variants={controls.scaleUp}
+                whileHover={{ y: -5 }}
+                className="group cursor-pointer h-full"
+              >
+                <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
+                  {leader.image ? (
+                    <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-4 text-primary-600 shadow-inner shrink-0">
+                      <UserCheck size={32} />
+                    </div>
+                  )}
+                  <div className="flex-grow flex flex-col justify-center">
+                    <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
+                    <p className="text-primary-600 text-[10px] md:text-xs font-bold uppercase tracking-wider">{leader.position}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <AnimatePresence>
+            {isSecondCommitteeVisible && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
+                className="overflow-hidden"
+              >
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 pb-8">
+                  {secondExecutiveCommittee.slice(5).map((leader, i) => (
+                    <motion.div
+                      key={`rest2-${i}`}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -5 }}
+                      className="group cursor-pointer h-full"
+                    >
+                      <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
+                        {leader.image ? (
+                          <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
+                        ) : (
+                          <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-4 text-primary-600 shadow-inner shrink-0">
+                            <UserCheck size={32} />
+                          </div>
+                        )}
+                        <div className="flex-grow flex flex-col justify-center">
+                          <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
+                          <p className="text-primary-600 text-[10px] md:text-xs font-bold uppercase tracking-wider">{leader.position}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="text-center mt-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsSecondCommitteeVisible(!isSecondCommitteeVisible)}
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-primary-700 border-2 border-primary-200 font-black text-sm uppercase tracking-wider rounded-full shadow-lg hover:shadow-xl hover:bg-primary-50 transition-all"
+            >
+              {isSecondCommitteeVisible ? t.hideCommittee : t.viewCommittee}
+              <motion.div
+                animate={{ rotate: isSecondCommitteeVisible ? -90 : 90 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronRight size={18} />
+              </motion.div>
+            </motion.button>
           </div>
         </div>
       </section>
@@ -999,49 +1371,39 @@ const About = () => {
         </div>
       </section>
 
-      {/* Testimonials Section - Empty */}
-      <section className="py-32 bg-white">
-        <div className="max-w-7xl mx-auto px-2">
-          <div className="text-center mb-16">
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={controls.scaleUp}
-              className="inline-flex items-center gap-2 bg-primary-100 px-4 py-2 rounded-full mb-4"
-            >
-              <MessageCircle size={14} className="text-primary-600" />
-              <span className="text-primary-700 text-xs font-black uppercase tracking-wider">Testimonials</span>
-            </motion.div>
-            <motion.h2
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={controls.fadeInUp}
-              className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter mb-4"
-            >
-              {t.membersSay} <span className="text-primary-600">{t.membersSayEnd}</span>
-            </motion.h2>
-          </div>
-
-          <div className="flex items-center justify-center min-h-[200px]">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-center"
-            >
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="text-6xl mb-4"
-              >
-                💬
-              </motion.div>
-              <p className="text-2xl font-bold text-slate-400 tracking-tight">Coming Soon</p>
-              <p className="text-slate-400">Member testimonials will appear here</p>
-            </motion.div>
-          </div>
+      {/* Why Join ACLAP Section */}
+      <section className="py-24 bg-white">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={controls.scaleUp}
+            className="inline-flex items-center gap-2 bg-primary-100 px-4 py-2 rounded-full mb-8 shadow-sm"
+          >
+            <ShieldCheck size={16} className="text-primary-600" />
+            <span className="text-primary-700 text-sm font-black uppercase tracking-wider">{t.whyJoinAclap}</span>
+          </motion.div>
+          <motion.h2
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={controls.fadeInUp}
+            className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-8 leading-tight"
+          >
+            {t.whyJoinTaglineStart} <span className="text-primary-600">{t.whyJoinTaglineEnd}</span>
+          </motion.h2>
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={controls.fadeInUp}
+            className="bg-slate-50 border border-slate-100 rounded-3xl p-8 md:p-12 shadow-inner"
+          >
+            <p className="text-slate-600 text-lg md:text-xl leading-relaxed font-medium">
+              {t.whyJoinDesc}
+            </p>
+          </motion.div>
         </div>
       </section>
 
