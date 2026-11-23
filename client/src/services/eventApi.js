@@ -1,24 +1,8 @@
 import axios from 'axios';
 import { supabase } from './supabase';
+import { getApiBaseUrl } from './apiConfig';
 
-let rawApiUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5001').trim().replace(/\/+$/, '');
-if (rawApiUrl.startsWith('https://localhost')) {
-  rawApiUrl = rawApiUrl.replace('https://localhost', 'http://localhost');
-}
-
-// Auto-adjust backend host when testing on mobile over local Wi-Fi
-if (
-  typeof window !== 'undefined' &&
-  window.location.hostname &&
-  window.location.hostname !== 'localhost' &&
-  window.location.hostname !== '127.0.0.1'
-) {
-  if (rawApiUrl.includes('localhost')) {
-    rawApiUrl = rawApiUrl.replace('localhost', window.location.hostname);
-  }
-}
-
-const API_BASE = `${rawApiUrl}/api/events`;
+const API_BASE = `${getApiBaseUrl()}/api/events`;
 
 const eventApi = axios.create({
   baseURL: API_BASE,

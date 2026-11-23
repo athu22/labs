@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ShieldAlert, Lock, Mail, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { getApiBaseUrl } from '../../services/apiConfig';
 
 const SuperAdminSetup = () => {
   const [email, setEmail] = useState('');
@@ -18,7 +19,7 @@ const SuperAdminSetup = () => {
     setError('');
     
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+      const API_URL = getApiBaseUrl();
       const response = await axios.post(`${API_URL}/api/setup/initialize-master`, {
         email,
         password

@@ -10,8 +10,9 @@ import {
     Archive, FolderTree, Landmark, XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getApiBaseUrl } from '../../../services/apiConfig';
 
-const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/accounting`;
+const API_URL = `${getApiBaseUrl()}/api/accounting`;
 
 const TallyAccountLogin = () => {
     const [activeTab, setActiveTab] = useState('dashboard');

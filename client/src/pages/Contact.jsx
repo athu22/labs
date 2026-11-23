@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { LanguageContext } from '../context/LanguageContext';
+import { getApiBaseUrl } from '../services/apiConfig';
 
 // Translations for Contact Page
 const translations = {
@@ -249,7 +250,7 @@ const Contact = () => {
         setError('');
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+            const API_URL = getApiBaseUrl();
             const response = await fetch(`${API_URL}/api/contact/send`, {
                 method: 'POST',
                 headers: {
