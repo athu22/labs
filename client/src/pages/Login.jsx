@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { auth, db } from '../services/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
 import {
   Mail,
   Key,
@@ -38,20 +36,28 @@ const Login = () => {
     setError('');
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
+      if (authError) throw authError;
 
-        if (userData.role === 'super-admin' || userData.role === 'admin') {
-          await auth.signOut();
+      const { data: userDoc, error: docError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', authData.user.id)
+        .single();
+
+      if (userDoc) {
+        if (userDoc.role === 'super-admin' || userDoc.role === 'admin') {
+          await supabase.auth.signOut();
           setError('Admin accounts must use the dedicated administration portal.');
           setLoading(false);
           return;
         }
 
-        login(userCredential.user, userData);
+        login(authData.user, userDoc);
         navigate(from, { replace: true });
       } else {
         setError('Member profile node not found in registry.');
@@ -106,11 +112,11 @@ const Login = () => {
       </div>
 
       {/* 2. Form Column */}
-      <div className="flex-grow flex items-center justify-center p-8 bg-white lg:bg-slate-50">
+      <div className="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-white lg:bg-slate-50">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white p-10 lg:p-12 rounded-[3rem] shadow-2xl shadow-slate-900/5 border border-slate-100"
+          className="w-full max-w-md bg-white p-6 sm:p-8 lg:p-12 rounded-3xl lg:rounded-[3rem] shadow-2xl shadow-slate-900/5 border border-slate-100"
         >
           <div className="mb-10">
             <div className="lg:hidden flex items-center gap-3 mb-8">

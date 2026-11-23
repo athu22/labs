@@ -4,7 +4,7 @@ import { Menu, X, User, LogOut, ChevronRight, Globe, Check } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { LanguageContext } from '../context/LanguageContext';
-import { auth } from '../services/firebase';
+
 
 // Translations
 const translations = {

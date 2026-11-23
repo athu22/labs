@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db, storage } from '../../../services/firebase';
-import { collection, addDoc, getDocs, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '../../../services/supabase';
 import { Plus, Trash2, Image as ImageIcon, Upload, Loader2, Sparkles } from 'lucide-react';
 import { compressImage } from '../../../utils/imageOptimizer';
 
@@ -20,9 +18,16 @@ const GallerySection = () => {
   const fetchGallery = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'gallery'), orderBy('createdAt', 'desc'));
-      const snap = await getDocs(q);
-      setImages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const { data, error } = await supabase
+        .from('gallery')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setImages((data || []).map(item => ({
+        ...item,
+        imageUrls: item.imageUrls || item.image_urls || [],
+      })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -51,18 +56,29 @@ const GallerySection = () => {
         setOptimizing(true);
         const optimizedFile = await compressImage(file, 1200, 0.7);
         setOptimizing(false);
-        
-        const imageRef = ref(storage, `gallery/${Date.now()}_${optimizedFile.name}`);
-        const snap = await uploadBytes(imageRef, optimizedFile);
-        const url = await getDownloadURL(snap.ref);
-        imageUrls.push(url);
+
+        const safeName = (optimizedFile.name || 'photo.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const filePath = `gallery/${Date.now()}_${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('uploads')
+          .upload(filePath, optimizedFile);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('uploads')
+          .getPublicUrl(filePath);
+
+        imageUrls.push(urlData.publicUrl);
       }
 
-      await addDoc(collection(db, 'gallery'), {
+      const { error: insertError } = await supabase.from('gallery').insert([{
         title: galleryTitle || 'Association Gallery',
-        imageUrls,
-        createdAt: serverTimestamp()
-      });
+        image_urls: imageUrls,
+        created_at: new Date().toISOString()
+      }]);
+
+      if (insertError) throw insertError;
 
       setGalleryTitle('');
       setImageFiles([null, null, null, null, null]);
@@ -70,7 +86,7 @@ const GallerySection = () => {
       alert("Gallery updated successfully!");
     } catch (e) {
       console.error(e);
-      alert("Error uploading gallery.");
+      alert("Error uploading gallery: " + (e.message || 'Check Supabase storage bucket "uploads".'));
     } finally {
       setUploading(false);
     }
@@ -80,24 +96,25 @@ const GallerySection = () => {
     if (!confirm('Are you sure you want to permanently delete this gallery album and all its photos?')) return;
 
     try {
-      // 1. Delete all photos from Storage first
+      // 1. Delete all photos from Supabase Storage first
       if (album.imageUrls && album.imageUrls.length > 0) {
-        for (const url of album.imageUrls) {
-          try {
-            const decodedUrl = decodeURIComponent(url);
-            const startIndex = decodedUrl.indexOf('/o/') + 3;
-            const endIndex = decodedUrl.indexOf('?');
-            const filePath = decodedUrl.substring(startIndex, endIndex);
-            const imageRef = ref(storage, filePath);
-            await deleteObject(imageRef);
-          } catch (err) {
-            console.warn("Could not delete a gallery photo from storage:", err);
-          }
+        const paths = album.imageUrls
+          .map(url => {
+            const marker = '/storage/v1/object/public/uploads/';
+            const idx = url.indexOf(marker);
+            return idx !== -1 ? decodeURIComponent(url.slice(idx + marker.length).split('?')[0]) : null;
+          })
+          .filter(Boolean);
+
+        if (paths.length > 0) {
+          const { error: storageErr } = await supabase.storage.from('uploads').remove(paths);
+          if (storageErr) console.warn("Could not delete gallery photos from storage:", storageErr);
         }
       }
 
-      // 2. Delete from Firestore
-      await deleteDoc(doc(db, 'gallery', album.id));
+      // 2. Delete from Supabase DB
+      const { error } = await supabase.from('gallery').delete().eq('id', album.id);
+      if (error) throw error;
 
       fetchGallery();
       alert("Gallery album deleted successfully.");

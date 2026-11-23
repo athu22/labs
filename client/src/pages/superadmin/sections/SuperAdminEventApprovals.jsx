@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../services/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import { Check, X, User, Calendar, CreditCard, Filter, Loader2, ShieldCheck, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -9,24 +8,54 @@ const SuperAdminEventApprovals = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('verified'); // pending (if direct), verified, approved, rejected
 
-  useEffect(() => {
-    const q = query(collection(db, 'event_registrations'));
+  const fetchRegistrations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('event_registrations')
+        .select('*')
+        .order('registered_at', { ascending: false });
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setRegistrations(data);
+      if (error) throw error;
+      setRegistrations((data || []).map(reg => ({
+        ...reg,
+        fullName: reg.fullName || reg.full_name,
+        eventTitle: reg.eventTitle || reg.event_title,
+        memberType: reg.memberType || reg.member_type,
+        transactionId: reg.transactionId || reg.transaction_id,
+      })));
+    } catch (error) {
+      console.error("Error fetching event registrations:", error);
+    } finally {
       setLoading(false);
-    });
+    }
+  };
 
-    return () => unsubscribe();
+  useEffect(() => {
+    fetchRegistrations();
+
+    const channel = supabase
+      .channel('superadmin-event-registrations')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_registrations' },
+        () => fetchRegistrations()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleApprove = async (id) => {
     try {
-      await updateDoc(doc(db, 'event_registrations', id), {
-        status: 'approved',
-        approvedAt: new Date(),
-      });
+      const { error } = await supabase
+        .from('event_registrations')
+        .update({ status: 'approved' })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchRegistrations();
     } catch (error) {
       console.error("Error approving:", error);
       alert("Failed to approve registration.");
@@ -36,10 +65,13 @@ const SuperAdminEventApprovals = () => {
   const handleReject = async (id) => {
     if (confirm('Reject this event registration?')) {
       try {
-        await updateDoc(doc(db, 'event_registrations', id), {
-          status: 'rejected',
-          rejectedAt: new Date()
-        });
+        const { error } = await supabase
+          .from('event_registrations')
+          .update({ status: 'rejected' })
+          .eq('id', id);
+
+        if (error) throw error;
+        fetchRegistrations();
       } catch (error) {
         console.error("Error rejecting:", error);
       }

@@ -1,12 +1,58 @@
-const { db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
+
+const formatGroup = (g) => ({
+  id: g.id,
+  name: g.name,
+  type: g.type,
+  parentGroupId: g.parent_group_id ?? g.parentGroupId ?? null,
+  createdAt: g.created_at ?? g.createdAt,
+});
+
+const formatAccount = (a) => ({
+  id: a.id,
+  name: a.name,
+  groupId: a.group_id ?? a.groupId ?? null,
+  type: a.type,
+  openingBalance: parseFloat(a.opening_balance ?? a.openingBalance ?? 0),
+  currentBalance: parseFloat(a.current_balance ?? a.currentBalance ?? 0),
+  createdAt: a.created_at ?? a.createdAt,
+});
+
+const formatTransaction = (t) => ({
+  id: t.id,
+  date: t.date,
+  voucherType: t.voucher_type ?? t.voucherType,
+  partyName: t.party_name ?? t.partyName,
+  totalAmount: parseFloat(t.total_amount ?? t.totalAmount ?? 0),
+  narration: t.narration,
+  entries: t.entries || [],
+  items: t.items || [],
+  createdAt: t.created_at ?? t.createdAt,
+});
+
+const formatLedger = (l) => ({
+  id: l.id,
+  accountId: l.account_id ?? l.accountId,
+  transactionId: l.transaction_id ?? l.transactionId,
+  date: l.date,
+  voucherType: l.voucher_type ?? l.voucherType,
+  type: l.type,
+  amount: parseFloat(l.amount ?? 0),
+  balanceAfter: parseFloat(l.balance_after ?? l.balanceAfter ?? 0),
+  narration: l.narration,
+});
 
 // --- Account Groups ---
 const getAccountGroups = async (req, res) => {
   try {
-    const snapshot = await db.collection('accountGroups').orderBy('name').get();
-    const groups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(groups);
+    const { data, error } = await supabase
+      .from('account_groups')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json((data || []).map(formatGroup));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -15,13 +61,19 @@ const getAccountGroups = async (req, res) => {
 const createAccountGroup = async (req, res) => {
   try {
     const { name, type, parentGroupId } = req.body;
-    const docRef = await db.collection('accountGroups').add({
-      name,
-      type, // 'Asset', 'Liability', 'Income', 'Expense'
-      parentGroupId: parentGroupId || null,
-      createdAt: new Date()
-    });
-    res.json({ id: docRef.id, message: 'Account Group created' });
+    const { data, error } = await supabase
+      .from('account_groups')
+      .insert([{
+        name,
+        type, // 'Asset', 'Liability', 'Income', 'Expense'
+        parent_group_id: parentGroupId || null,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ id: data.id, message: 'Account Group created' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -30,9 +82,13 @@ const createAccountGroup = async (req, res) => {
 // --- Accounts ---
 const getAccounts = async (req, res) => {
   try {
-    const snapshot = await db.collection('accounts').orderBy('name').get();
-    const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    res.json(accounts);
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+    res.json((data || []).map(formatAccount));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -41,15 +97,23 @@ const getAccounts = async (req, res) => {
 const createAccount = async (req, res) => {
   try {
     const { name, groupId, openingBalance = 0, type } = req.body;
-    const docRef = await db.collection('accounts').add({
-      name,
-      groupId,
-      type, // inherited from group: 'Asset', 'Liability', 'Income', 'Expense'
-      openingBalance: parseFloat(openingBalance),
-      currentBalance: parseFloat(openingBalance),
-      createdAt: new Date()
-    });
-    res.json({ id: docRef.id, message: 'Account created' });
+    const parsedOpening = parseFloat(openingBalance) || 0;
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert([{
+        name,
+        group_id: groupId || null,
+        type, // inherited from group: 'Asset', 'Liability', 'Income', 'Expense'
+        opening_balance: parsedOpening,
+        current_balance: parsedOpening,
+        created_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ id: data.id, message: 'Account created' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -58,72 +122,88 @@ const createAccount = async (req, res) => {
 // --- Transactions ---
 const createTransaction = async (req, res) => {
   try {
-    const { 
-      date, 
+    const {
+      date,
       voucherType, // 'purchase', 'sale', 'receipt', 'payment', 'journal'
       partyName,
       totalAmount,
       narration,
-      entries, // Array of { accountId, type: 'debit'|'credit', amount }
+      entries = [], // Array of { accountId, type: 'debit'|'credit', amount }
       items // Optional for purchase/sale
     } = req.body;
 
-    const batch = db.batch();
     const transactionId = uuidv4();
-    const transactionRef = db.collection('transactions').doc(transactionId);
+    const parsedDate = new Date(date).toISOString();
 
-    batch.set(transactionRef, {
-      date: new Date(date),
-      voucherType,
-      partyName,
-      totalAmount: parseFloat(totalAmount),
-      narration,
-      entries,
-      items: items || [],
-      createdAt: new Date()
-    });
+    const { error: txError } = await supabase
+      .from('transactions')
+      .insert([{
+        id: transactionId,
+        date: parsedDate,
+        voucher_type: voucherType,
+        party_name: partyName,
+        total_amount: parseFloat(totalAmount) || 0,
+        narration,
+        entries,
+        items: items || [],
+        created_at: new Date().toISOString()
+      }]);
 
-    // Update Account Balances
+    if (txError) throw txError;
+
+    // Update Account Balances & Create Ledger Entries
+    const ledgerRows = [];
     for (const entry of entries) {
-      const accountRef = db.collection('accounts').doc(entry.accountId);
-      const accountDoc = await accountRef.get();
-      if (!accountDoc.exists) continue;
+      const { data: accountData, error: accErr } = await supabase
+        .from('accounts')
+        .select('*')
+        .eq('id', entry.accountId)
+        .single();
 
-      const accountData = accountDoc.data();
-      let newBalance = parseFloat(accountData.currentBalance || 0);
+      if (accErr || !accountData) continue;
+
+      let newBalance = parseFloat(accountData.current_balance || 0);
+      const entryAmount = parseFloat(entry.amount) || 0;
 
       // Debit/Credit Logic
       if (entry.type === 'debit') {
         if (accountData.type === 'Asset' || accountData.type === 'Expense') {
-          newBalance += parseFloat(entry.amount);
+          newBalance += entryAmount;
         } else {
-          newBalance -= parseFloat(entry.amount);
+          newBalance -= entryAmount;
         }
       } else if (entry.type === 'credit') {
         if (accountData.type === 'Liability' || accountData.type === 'Income') {
-          newBalance += parseFloat(entry.amount);
+          newBalance += entryAmount;
         } else {
-          newBalance -= parseFloat(entry.amount);
+          newBalance -= entryAmount;
         }
       }
 
-      batch.update(accountRef, { currentBalance: newBalance });
+      const { error: updateErr } = await supabase
+        .from('accounts')
+        .update({ current_balance: newBalance })
+        .eq('id', entry.accountId);
 
-      // Create Ledger Entry
-      const ledgerRef = db.collection('ledger').doc();
-      batch.set(ledgerRef, {
-        accountId: entry.accountId,
-        transactionId,
-        date: new Date(date),
-        voucherType,
+      if (updateErr) throw updateErr;
+
+      ledgerRows.push({
+        account_id: entry.accountId,
+        transaction_id: transactionId,
+        date: parsedDate,
+        voucher_type: voucherType,
         type: entry.type,
-        amount: parseFloat(entry.amount),
-        balanceAfter: newBalance,
+        amount: entryAmount,
+        balance_after: newBalance,
         narration
       });
     }
 
-    await batch.commit();
+    if (ledgerRows.length > 0) {
+      const { error: ledgerErr } = await supabase.from('ledger').insert(ledgerRows);
+      if (ledgerErr) throw ledgerErr;
+    }
+
     res.json({ id: transactionId, message: 'Transaction recorded successfully' });
   } catch (error) {
     console.error('Transaction Error:', error);
@@ -133,34 +213,21 @@ const createTransaction = async (req, res) => {
 
 const getTransactions = async (req, res) => {
   try {
-    const { voucherType, startDate, endDate } = req.query;
-    let query = db.collection('transactions');
+    const { voucherType, startDate, endDate, limit } = req.query;
+    let query = supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false });
 
-    if (voucherType) query = query.where('voucherType', '==', voucherType);
-    // Note: Filtering by date and ordering requires composite index in Firestore.
-    // For now, we fetch all and filter/sort in memory if indexes aren't set up.
-    
-    const snapshot = await query.get();
-    let transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    if (voucherType) query = query.eq('voucher_type', voucherType);
+    if (startDate) query = query.gte('date', new Date(startDate).toISOString());
+    if (endDate) query = query.lte('date', new Date(endDate).toISOString());
+    if (limit) query = query.limit(parseInt(limit, 10));
 
-    // Filter by date in memory if provided
-    if (startDate) {
-      const start = new Date(startDate);
-      transactions = transactions.filter(t => t.date.toDate() >= start);
-    }
-    if (endDate) {
-      const end = new Date(endDate);
-      transactions = transactions.filter(t => t.date.toDate() <= end);
-    }
+    const { data, error } = await query;
+    if (error) throw error;
 
-    // Sort by date desc in memory with safety
-    transactions.sort((a, b) => {
-      const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date || 0);
-      const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date || 0);
-      return dateB - dateA;
-    });
-
-    res.json(transactions);
+    res.json((data || []).map(formatTransaction));
   } catch (error) {
     console.error('getTransactions Error:', error);
     res.status(500).json({ error: error.message });
@@ -170,25 +237,15 @@ const getTransactions = async (req, res) => {
 const getLedger = async (req, res) => {
   try {
     const { accountId } = req.params;
-    
-    const snapshot = await db.collection('ledger')
-      .where('accountId', '==', accountId)
-      .get();
-    
-    let entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
-    // Sort in memory with robust safety
-    entries.sort((a, b) => {
-      try {
-        const dateA = (a.date && typeof a.date.toDate === 'function') ? a.date.toDate() : new Date(a.date || 0);
-        const dateB = (b.date && typeof b.date.toDate === 'function') ? b.date.toDate() : new Date(b.date || 0);
-        return dateA - dateB;
-      } catch (e) {
-        return 0;
-      }
-    });
-    
-    res.json(entries);
+
+    const { data, error } = await supabase
+      .from('ledger')
+      .select('*')
+      .eq('account_id', accountId)
+      .order('date', { ascending: true });
+
+    if (error) throw error;
+    res.json((data || []).map(formatLedger));
   } catch (error) {
     console.error('getLedger Error:', error);
     res.status(500).json({ error: error.message });
@@ -197,14 +254,20 @@ const getLedger = async (req, res) => {
 
 const getTrialBalance = async (req, res) => {
   try {
-    const snapshot = await db.collection('accounts').get();
-    const accounts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    
+    const { data, error } = await supabase.from('accounts').select('*');
+    if (error) throw error;
+
+    const accounts = (data || []).map(formatAccount);
+
     const trialBalance = accounts.map(acc => ({
       accountName: acc.name,
       type: acc.type,
-      debit: acc.currentBalance > 0 && (acc.type === 'Asset' || acc.type === 'Expense') ? acc.currentBalance : (acc.currentBalance < 0 && (acc.type === 'Liability' || acc.type === 'Income') ? Math.abs(acc.currentBalance) : 0),
-      credit: acc.currentBalance > 0 && (acc.type === 'Liability' || acc.type === 'Income') ? acc.currentBalance : (acc.currentBalance < 0 && (acc.type === 'Asset' || acc.type === 'Expense') ? Math.abs(acc.currentBalance) : 0),
+      debit: acc.currentBalance > 0 && (acc.type === 'Asset' || acc.type === 'Expense')
+        ? acc.currentBalance
+        : (acc.currentBalance < 0 && (acc.type === 'Liability' || acc.type === 'Income') ? Math.abs(acc.currentBalance) : 0),
+      credit: acc.currentBalance > 0 && (acc.type === 'Liability' || acc.type === 'Income')
+        ? acc.currentBalance
+        : (acc.currentBalance < 0 && (acc.type === 'Asset' || acc.type === 'Expense') ? Math.abs(acc.currentBalance) : 0),
     }));
 
     res.json(trialBalance);

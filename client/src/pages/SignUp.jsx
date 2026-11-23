@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { auth, db } from '../services/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   Mail,
@@ -23,6 +22,7 @@ const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from || { pathname: '/' };
@@ -33,24 +33,39 @@ const SignUp = () => {
     setError('');
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // Create a basic user document
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
-        email: user.email,
-        fullName: fullName,
-        role: 'member', // Default role
-        isProfileComplete: false,
-        createdAt: new Date().toISOString()
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
       });
 
+      if (authError) throw authError;
+
+      const user = authData.user;
+
+      if (user) {
+        const userRow = {
+          auth_id: user.id,
+          email: user.email,
+          fullName: fullName,
+          role: 'member', // Default role
+          isProfileComplete: false,
+          created_at: new Date().toISOString()
+        };
+
+        // Create a basic user document
+        const { error: dbError } = await supabase.from('users').insert([userRow]);
+
+        if (dbError) throw dbError;
+
+        // Replace any stale mock/admin session with the newly signed-up member
+        login(user, userRow);
+      }
+
       // Redirect directly to the membership registration form
-      navigate('/register', { state: { from } });
+      navigate('/register', { state: { from }, replace: true });
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
+      if (err.message && err.message.includes('already registered')) {
         setError('This email is already registered in our database. Please login instead.');
       } else {
         setError('Failed to create account. Please check your connection and try again.');
@@ -87,11 +102,11 @@ const SignUp = () => {
       </div>
 
       {/* Form Column */}
-      <div className="flex-grow flex items-center justify-center p-8 bg-white lg:bg-slate-50">
+      <div className="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8 bg-white lg:bg-slate-50">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white p-10 lg:p-12 rounded-[3rem] shadow-2xl shadow-slate-900/5 border border-slate-100"
+          className="w-full max-w-md bg-white p-6 sm:p-8 lg:p-12 rounded-3xl lg:rounded-[3rem] shadow-2xl shadow-slate-900/5 border border-slate-100"
         >
           <div className="mb-10">
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">Create Account</h3>

@@ -1,259 +1,318 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { db } from '../services/firebase';
-import { collection, getDocs, orderBy, query } from 'firebase/firestore';
-import { Calendar, MapPin, Clock, Users, ArrowRight, Sparkles, Filter, Search } from 'lucide-react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import {
+  Calendar,
+  MapPin,
+  Clock,
+  Users,
+  ArrowRight,
+  Sparkles,
+  Filter,
+  Search,
+  Tag,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import { LanguageContext } from '../context/LanguageContext';
+import eventApi from '../services/eventApi';
 
-// Translations for Events Page
 const translations = {
-   en: {
-      // Header
-      knowledgeEcosystem: 'Knowledge Ecosystem',
-      eventsTitle: 'Clinical',
-      eventsTitleHighlight: 'Workshops',
-      eventsTitleEnd: '& Annual Conferences',
-      eventsDesc: 'Stay ahead in clinical laboratory science with our expert-led webinars, hands-on training sessions, and networking events.',
-
-      // Filter
-      sortArchitecture: 'Sort Architecture',
-      latestScheduled: 'Latest Scheduled',
-      pastEvents: 'Past Events',
-      searchPlaceholder: 'Search by topic or speaker...',
-
-      // Event Cards
-      nodeRegistry: 'Node Registry',
-      reserveSeat: 'Reserve Seat',
-      morePhotos: 'More Photos',
-      clinicalWorkshop: 'Clinical Workshop',
-
-      // Empty State
-      noEvents: 'No active events scheduled for current cycle',
-
-      // Bottom CTA
-      proposeEvent: 'Propose a Scientific Event',
-      proposeEventDesc: 'Are you a subject matter expert? Partner with ACLAP to host clinical webinars and workshops for our pan-India community.',
-      inquirePartnership: 'Inquire Partnership',
-
-      // Loading
-      loading: 'Loading...',
-   },
-   mr: {
-      // Header
-      knowledgeEcosystem: 'ज्ञान परिसंस्था',
-      eventsTitle: 'नैदानिक',
-      eventsTitleHighlight: 'कार्यशाळा',
-      eventsTitleEnd: 'आणि वार्षिक परिषदा',
-      eventsDesc: 'आमच्या तज्ज्ञ-नेतृत्वाखालील वेबिनार, हँड्स-ऑन प्रशिक्षण सत्रे आणि नेटवर्किंग इव्हेंट्ससह नैदानिक प्रयोगशाळा विज्ञानात आघाडीवर राहा.',
-
-      // Filter
-      sortArchitecture: 'क्रमवारी रचना',
-      latestScheduled: 'नवीनतम नियोजित',
-      pastEvents: 'पूर्वीचे कार्यक्रम',
-      searchPlaceholder: 'विषय किंवा वक्त्यानुसार शोधा...',
-
-      // Event Cards
-      nodeRegistry: 'नोड नोंदणी',
-      reserveSeat: 'जागा राखून ठेवा',
-      morePhotos: 'अधिक फोटो',
-      clinicalWorkshop: 'नैदानिक कार्यशाळा',
-
-      // Empty State
-      noEvents: 'सध्याच्या सायकलसाठी कोणतेही सक्रिय कार्यक्रम नियोजित नाहीत',
-
-      // Bottom CTA
-      proposeEvent: 'वैज्ञानिक कार्यक्रम प्रस्तावित करा',
-      proposeEventDesc: 'तुम्ही विषय तज्ज्ञ आहात का? आमच्या पॅन-इंडिया समुदायासाठी नैदानिक वेबिनार आणि कार्यशाळा आयोजित करण्यासाठी ACLAP सोबत भागीदार व्हा.',
-      inquirePartnership: 'भागीदारी चौकशी',
-
-      // Loading
-      loading: 'लोड होत आहे...',
-   }
+  en: {
+    knowledgeEcosystem: 'Knowledge Ecosystem',
+    eventsTitle: 'Clinical',
+    eventsTitleHighlight: 'Workshops',
+    eventsTitleEnd: '& Annual Conferences',
+    eventsDesc:
+      'Stay ahead in clinical laboratory science with our expert-led webinars, hands-on training sessions, and networking events.',
+    sortArchitecture: 'Filter Events',
+    allEvents: 'All Events',
+    upcomingEvents: 'Upcoming Events',
+    freeEvents: 'Free Events',
+    searchPlaceholder: 'Search by event title, venue, or category...',
+    availableSeats: 'Available Tickets',
+    soldOut: 'Sold Out',
+    memberFee: 'Member Fee',
+    nonMemberFee: 'Non-Member Fee',
+    freeEvent: 'FREE ENTRY',
+    registerNow: 'Register Now',
+    noEvents: 'No active events scheduled for current cycle',
+    loading: 'Loading Events...',
+  },
+  mr: {
+    knowledgeEcosystem: 'ज्ञान परिसंस्था',
+    eventsTitle: 'नैदानिक',
+    eventsTitleHighlight: 'कार्यशाळा',
+    eventsTitleEnd: 'आणि वार्षिक परिषदा',
+    eventsDesc:
+      'आमच्या तज्ज्ञ-नेतृत्वाखालील वेबिनार, हँड्स-ऑन प्रशिक्षण सत्रे आणि नेटवर्किंग इव्हेंट्ससह नैदानिक प्रयोगशाळा विज्ञानात आघाडीवर राहा.',
+    sortArchitecture: 'फिल्टर करा',
+    allEvents: 'सर्व कार्यक्रम',
+    upcomingEvents: 'आगामी कार्यक्रम',
+    freeEvents: 'विनामूल्य कार्यक्रम',
+    searchPlaceholder: 'कार्यक्रमाचे नाव, ठिकाण किंवा वर्गवारीनुसार शोधा...',
+    availableSeats: 'उपलब्ध तिकिटे',
+    soldOut: 'तिकिटे संपली',
+    memberFee: 'सदस्य शुल्क',
+    nonMemberFee: 'गैर-सदस्य शुल्क',
+    freeEvent: 'मोफत प्रवेश',
+    registerNow: 'नोंदणी करा',
+    noEvents: 'सध्याच्या सायकलसाठी कोणतेही सक्रिय कार्यक्रम नियोजित नाहीत',
+    loading: 'कार्यक्रम लोड होत आहेत...',
+  },
 };
 
 const Events = () => {
-   const { language } = useContext(LanguageContext);
-   const t = translations[language];
+  const { language } = useContext(LanguageContext);
+  const t = translations[language] || translations.en;
 
-   const [events, setEvents] = useState([]);
-   const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
 
-   useEffect(() => {
-      const fetchEvents = async () => {
-         try {
-            const q = query(collection(db, 'events'), orderBy('date', 'desc'));
-            const snap = await getDocs(q);
-            setEvents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-         } catch (error) {
-            console.error("Error fetching events:", error);
-         } finally {
-            setLoading(false);
-         }
-      };
-      fetchEvents();
-   }, []);
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
-   return (
-      <div className="bg-white pt-40 pb-24">
+  const fetchEvents = async () => {
+    setLoading(true);
+    try {
+      const res = await eventApi.get('/public');
+      setEvents(res.data || []);
+    } catch (err) {
+      console.error('[Events.jsx] Fetch failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-         {/* 1. Header Section */}
-         <section className="max-w-7xl mx-auto px-2 mb-20 text-center">
-            <motion.div
-               initial={{ opacity: 0, y: 20 }}
-               animate={{ opacity: 1, y: 0 }}
-               transition={{ duration: 0.6 }}
-            >
-               <span className="text-[11px] font-black text-primary-600 uppercase tracking-[0.3em] mb-4 inline-block">{t.knowledgeEcosystem}</span>
-               <h1 className="text-5xl lg:text-7xl font-black text-slate-900 tracking-tighter mb-8 leading-tight">
-                  {t.eventsTitle} <span className="text-primary-600">{t.eventsTitleHighlight}</span> & <br /> {t.eventsTitleEnd}
-               </h1>
-               <p className="text-slate-500 text-lg font-medium max-w-2xl mx-auto leading-relaxed">
-                  {t.eventsDesc}
-               </p>
-            </motion.div>
-         </section>
+  const filteredEvents = useMemo(() => {
+    return events.filter((ev) => {
+      const matchesSearch =
+        !searchTerm ||
+        ev.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ev.venue?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ev.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ev.district?.toLowerCase().includes(searchTerm.toLowerCase());
 
-         {/* 2. Filter & Controls */}
-         <section className="max-w-7xl mx-auto px-2 mb-12">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 p-2 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-sm">
-               <div className="flex items-center gap-2 px-6">
-                  <Filter className="text-slate-400" size={16} />
-                  <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{t.sortArchitecture}</span>
-                  <select className="bg-transparent border-none text-xs font-black text-slate-700 focus:ring-0 cursor-pointer uppercase">
-                     <option>{t.latestScheduled}</option>
-                     <option>{t.pastEvents}</option>
-                  </select>
-               </div>
-               <div className="relative w-full md:w-96 mr-2">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                  <input
-                     type="text"
-                     placeholder={t.searchPlaceholder}
-                     className="w-full bg-white border-none rounded-2xl py-3 pl-10 pr-4 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-primary-600/10 outline-none transition-all shadow-sm"
-                  />
-               </div>
+      if (!matchesSearch) return false;
+
+      if (filterType === 'free') return ev.isFree || (ev.memberFee === 0 && ev.nonMemberFee === 0);
+      if (filterType === 'upcoming') {
+        if (!ev.eventDate) return true;
+        return new Date(ev.eventDate) >= new Date(new Date().setHours(0, 0, 0, 0));
+      }
+      return true;
+    });
+  }, [events, searchTerm, filterType]);
+
+  return (
+    <div className="bg-white pt-40 pb-24">
+      {/* 1. Header Section */}
+      <section className="max-w-7xl mx-auto px-6 mb-16 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+        >
+          <span className="text-[11px] font-black text-primary-600 uppercase tracking-[0.3em] mb-4 inline-block">
+            {t.knowledgeEcosystem}
+          </span>
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-slate-900 tracking-tighter mb-6 leading-tight">
+            {t.eventsTitle}{' '}
+            <span className="text-primary-600">{t.eventsTitleHighlight}</span> & <br className="hidden sm:block" />
+            {t.eventsTitleEnd}
+          </h1>
+          <p className="text-slate-500 text-base sm:text-lg font-medium max-w-2xl mx-auto leading-relaxed">
+            {t.eventsDesc}
+          </p>
+        </motion.div>
+      </section>
+
+      {/* 2. Search & Filters Bar */}
+      <section className="max-w-7xl mx-auto px-6 mb-12">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-3 bg-slate-50 rounded-3xl border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 px-4 w-full md:w-auto">
+            <Filter className="text-slate-400 shrink-0" size={16} />
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">
+              {t.sortArchitecture}:
+            </span>
+            <div className="flex gap-1">
+              {[
+                { id: 'all', label: t.allEvents },
+                { id: 'upcoming', label: t.upcomingEvents },
+                { id: 'free', label: t.freeEvents },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => setFilterType(opt.id)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
+                    filterType === opt.id
+                      ? 'bg-primary-600 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-200/60'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-         </section>
+          </div>
 
-         {/* 3. Events Grid */}
-         <section className="max-w-7xl mx-auto px-2">
-            {loading ? (
-               <div className="py-24 text-center">
-                  <div className="w-12 h-12 border-4 border-primary-600/10 border-t-primary-600 rounded-full animate-spin mx-auto" />
-               </div>
-            ) : (
-               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {events.length > 0 ? events.map((event, i) => (
-                     <motion.div
-                        key={event.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="group bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden hover:border-primary-100 hover:shadow-2xl hover:shadow-primary-600/5 transition-all flex flex-col"
-                     >
-                        <div className="relative aspect-video overflow-hidden bg-slate-100 group/img">
-                           {event.imageUrl || (event.imageUrls && event.imageUrls.length > 0) ? (
-                              <div className="w-full h-full relative">
-                                 <img
-                                    src={event.imageUrl || event.imageUrls[0]}
-                                    alt={event.title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                 />
-                                 {event.imageUrls && event.imageUrls.length > 1 && (
-                                    <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
-                                       <Sparkles size={10} className="text-secondary-yellow" /> +{event.imageUrls.length - 1} {t.morePhotos}
-                                    </div>
-                                 )}
-                              </div>
-                           ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
-                                 <Calendar size={40} strokeWidth={1} />
-                              </div>
-                           )}
-                           <div className="absolute top-4 left-4">
-                              <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl text-center shadow-lg border border-white/20">
-                                 <p className="text-[10px] font-black text-primary-600 uppercase tracking-tighter leading-none mb-1">
-                                    {new Date(event.date).toLocaleString(language === 'mr' ? 'mr-IN' : 'en-US', { month: 'short' })}
-                                 </p>
-                                 <p className="text-xl font-black text-slate-900 leading-none">
-                                    {new Date(event.date).getDate()}
-                                 </p>
-                              </div>
-                           </div>
-                        </div>
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <input
+              type="text"
+              placeholder={t.searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-white border border-slate-200 rounded-2xl py-2.5 pl-10 pr-4 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-primary-600/10 focus:border-primary-500 outline-none transition-all shadow-sm"
+            />
+          </div>
+        </div>
+      </section>
 
-                        {/* Event Body */}
-                        <div className="p-8 flex-grow flex flex-col">
-                           <div className="flex items-center gap-2 mb-4">
-                              <span className="px-2.5 py-1 bg-primary-50 text-primary-600 text-[10px] font-black uppercase tracking-widest rounded-lg">
-                                 {event.type || t.clinicalWorkshop}
+      {/* 3. Event Cards Grid */}
+      <section className="max-w-7xl mx-auto px-6">
+        {loading ? (
+          <div className="py-24 text-center">
+            <Loader2 className="animate-spin text-primary-600 mx-auto mb-4" size={32} />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.loading}</p>
+          </div>
+        ) : filteredEvents.length > 0 ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {filteredEvents.map((event, i) => {
+              const isSoldOut = (event.availableTickets ?? 1) <= 0;
+              return (
+                <motion.div
+                  key={event.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="group bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden hover:border-primary-300 hover:shadow-2xl hover:shadow-primary-600/10 transition-all flex flex-col"
+                >
+                  {/* Banner & Badges */}
+                  <div className="relative aspect-video overflow-hidden bg-slate-100">
+                    {event.imageUrl || event.image_url ? (
+                      <img
+                        src={event.imageUrl || event.image_url}
+                        alt={event.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">
+                        <Calendar size={44} strokeWidth={1.5} />
+                      </div>
+                    )}
+
+                    {/* Category pill */}
+                    <div className="absolute top-4 left-4">
+                      <span className="px-3 py-1 bg-white/95 backdrop-blur-md rounded-xl text-[9px] font-black text-primary-600 uppercase tracking-widest shadow-sm">
+                        {event.category || 'Clinical Workshop'}
+                      </span>
+                    </div>
+
+                    {/* Availability pill */}
+                    <div className="absolute top-4 right-4">
+                      <span
+                        className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-sm ${
+                          isSoldOut
+                            ? 'bg-rose-500 text-white'
+                            : 'bg-emerald-500 text-white'
+                        }`}
+                      >
+                        {isSoldOut ? t.soldOut : `${event.availableTickets} ${t.availableSeats}`}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Event Details */}
+                  <div className="p-7 flex-grow flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 mb-3 tracking-tight leading-snug group-hover:text-primary-600 transition-colors line-clamp-2">
+                        {event.title}
+                      </h3>
+
+                      <div className="space-y-2 mb-6 text-xs text-slate-600">
+                        <div className="flex items-center gap-2.5">
+                          <Calendar size={14} className="text-primary-600 shrink-0" />
+                          <span className="font-bold">
+                            {event.date || event.eventDate || 'TBD'}
+                            {event.startTime ? ` • ${event.startTime}` : ''}
+                            {(event.isMultiDay || (event.eventEndDate && event.eventEndDate !== event.eventDate) || (typeof event.date === 'string' && event.date.includes(' to '))) && (
+                              <span className="ml-2 bg-purple-100 text-purple-800 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                2 Days
                               </span>
-                              <span className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
-                              <div className="flex items-center gap-1.5 text-slate-400">
-                                 <Users size={12} />
-                                 <span className="text-[10px] font-black uppercase tracking-widest">{t.nodeRegistry}</span>
-                              </div>
-                           </div>
-
-                           <h3 className="text-xl font-black text-slate-900 mb-4 tracking-tight leading-snug group-hover:text-primary-600 transition-colors">
-                              {event.title}
-                           </h3>
-
-                           <div className="space-y-3 mb-8">
-                              <div className="flex items-center gap-3 text-slate-500">
-                                 <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300">
-                                    <MapPin size={14} />
-                                 </div>
-                                 <span className="text-xs font-bold">{event.location}</span>
-                              </div>
-                              <div className="flex items-center gap-3 text-slate-500">
-                                 <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center text-slate-300">
-                                    <Clock size={14} />
-                                 </div>
-                                 <span className="text-xs font-bold">{event.time || '09:00 AM - 05:00 PM'}</span>
-                              </div>
-                           </div>
-
-                           <Link
-                              to={`/event-registration/${event.id}`}
-                              className="mt-auto w-full py-4 bg-slate-50 hover:bg-primary-600 text-slate-500 hover:text-white font-black text-[11px] uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 group/btn"
-                           >
-                              {t.reserveSeat} <ArrowRight size={14} className="group-hover/btn:translate-x-1 transition-transform" strokeWidth={3} />
-                           </Link>
+                            )}
+                          </span>
                         </div>
-                     </motion.div>
-                  )) : (
-                     <div className="col-span-full py-32 text-center bg-slate-50/50 rounded-[3rem] border border-dashed border-slate-200">
-                        <div className="w-16 h-16 bg-white rounded-3xl flex items-center justify-center text-slate-200 mx-auto mb-6 shadow-sm border border-slate-50">
-                           <Sparkles size={24} />
+                        <div className="flex items-center gap-2.5">
+                          <MapPin size={14} className="text-primary-600 shrink-0" />
+                          <span className="font-medium line-clamp-1">
+                            {event.venue || event.location || 'Maharashtra'}
+                            {event.district ? ` (${event.district})` : ''}
+                          </span>
                         </div>
-                        <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[11px]">{t.noEvents}</p>
-                     </div>
-                  )}
-               </div>
-            )}
-         </section>
+                      </div>
 
-         {/* 4. Bottom CTA */}
-         <section className="mt-32 max-w-7xl mx-auto px-2">
-            <div className="bg-slate-900 rounded-[3rem] p-12 lg:p-20 flex flex-col lg:flex-row items-center justify-between gap-12 overflow-hidden relative shadow-2xl">
-               <div className="absolute top-0 right-0 w-64 h-64 bg-primary-600/10 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2" />
+                      {/* Fee Structure Display */}
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl mb-6">
+                        {event.isFree || (event.memberFee === 0 && event.nonMemberFee === 0) ? (
+                          <div className="text-center">
+                            <span className="text-xs font-black text-emerald-600 uppercase tracking-wider">
+                              {t.freeEvent}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2 text-center">
+                            <div className="border-r border-slate-200 pr-2">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                {t.memberFee}
+                              </p>
+                              <p className="text-base font-black text-slate-900">
+                                {event.memberFee === 0 ? 'FREE' : `₹${event.memberFee}`}
+                              </p>
+                            </div>
+                            <div className="pl-2">
+                              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                {t.nonMemberFee}
+                              </p>
+                              <p className="text-base font-black text-slate-900">
+                                {event.nonMemberFee === 0 ? 'FREE' : `₹${event.nonMemberFee}`}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-               <div className="max-w-xl text-center lg:text-left">
-                  <h2 className="text-3xl lg:text-4xl font-black text-white mb-6">{t.proposeEvent}</h2>
-                  <p className="text-slate-400 font-medium leading-relaxed">
-                     {t.proposeEventDesc}
-                  </p>
-               </div>
-               <button className="px-10 py-5 bg-white text-slate-900 font-black text-[12px] uppercase tracking-[0.2em] rounded-2xl hover:bg-slate-100 transition-all active:scale-95 shadow-xl">
-                  {t.inquirePartnership}
-               </button>
-            </div>
-         </section>
-
-      </div>
-   );
+                    {/* Register Now CTA */}
+                    <Link
+                      to={`/event-registration/${event.id}`}
+                      className={`w-full py-3.5 px-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-sm active:scale-95 ${
+                        isSoldOut
+                          ? 'bg-slate-100 text-slate-400 pointer-events-none'
+                          : 'bg-primary-600 hover:bg-primary-700 text-white shadow-primary-600/20 hover:shadow-lg'
+                      }`}
+                    >
+                      {isSoldOut ? t.soldOut : t.registerNow}
+                      {!isSoldOut && <ArrowRight size={14} />}
+                    </Link>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-24 text-center bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+            <Sparkles className="mx-auto text-slate-300 mb-3" size={32} />
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t.noEvents}</p>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 };
 
 export default Events;

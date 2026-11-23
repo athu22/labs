@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../services/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import { Search, Mail, Phone, MapPin, MoreVertical, Users, UserCheck, Filter, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -13,9 +12,21 @@ const MemberManagement = () => {
     const fetchMembers = async () => {
       setLoading(true);
       try {
-        const q = query(collection(db, 'registrations'), where('status', '==', 'approved'));
-        const querySnapshot = await getDocs(q);
-        setMembers(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const { data, error } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('status', 'approved');
+
+        if (error) throw error;
+        setMembers((data || []).map(m => ({
+          ...m,
+          fullName:
+            m.fullName ||
+            m.full_name ||
+            [m.firstName || m.first_name, m.fatherName || m.father_name, m.surname || m.last_name]
+              .filter(Boolean)
+              .join(' '),
+        })));
       } catch (e) {
         console.error(e);
       } finally {

@@ -249,7 +249,7 @@ const Contact = () => {
         setError('');
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
             const response = await fetch(`${API_URL}/api/contact/send`, {
                 method: 'POST',
                 headers: {
@@ -347,7 +347,7 @@ const Contact = () => {
                             <span className="text-xs font-medium text-slate-600">{t.supportAvailable}</span>
                         </div>
 
-                        <h1 className="text-6xl lg:text-7xl font-black text-slate-900 tracking-tighter mb-6">
+                        <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black text-slate-900 tracking-tight mb-6">
                             {t.getInTouch}{' '}
                             <span className="relative inline-block">
                                 {t.touch}
@@ -677,9 +677,9 @@ const Contact = () => {
                         {/* Office Hours with Live Status */}
                         <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-6 text-white">
                             <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 text-white">
                                     <Clock size={20} />
-                                    <h3 className="text-lg font-black">{t.officeHours}</h3>
+                                    <h3 className="text-lg font-black text-white">{t.officeHours}</h3>
                                 </div>
                                 <div className="flex items-center gap-1 bg-green-500/20 px-3 py-1 rounded-full">
                                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -797,7 +797,7 @@ const Contact = () => {
 
             {/* WhatsApp Chat Button */}
             <motion.a
-                href="https://wa.me/919921465676?text=Hello%20ACLAP%2C%20I%20need%20assistance%20with..."
+                href="https://wa.me/919921485676?text=Hello%20ACLAP%2C%20I%20need%20assistance%20with..."
                 target="_blank"
                 rel="noopener noreferrer"
                 initial={{ opacity: 0, scale: 0 }}

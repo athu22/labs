@@ -1,19 +1,27 @@
-const { db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 
 const approveRegistration = async (req, res) => {
   const { id } = req.params;
   try {
-    const regRef = db.collection('registrations').doc(id);
-    const reg = await regRef.get();
+    const { data: reg, error: fetchErr } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!reg.exists) {
+    if (fetchErr || !reg) {
       return res.status(404).json({ error: 'Registration not found' });
     }
 
-    await regRef.update({
-      status: 'approved',
-      approvedAt: new Date(),
-    });
+    const { error: updateErr } = await supabase
+      .from('registrations')
+      .update({
+        status: 'approved',
+        approved_at: new Date()
+      })
+      .eq('id', id);
+
+    if (updateErr) throw updateErr;
 
     res.json({ message: 'Registration approved successfully' });
   } catch (error) {
@@ -24,8 +32,12 @@ const approveRegistration = async (req, res) => {
 
 const getPendingRegistrations = async (req, res) => {
   try {
-    const snapshot = await db.collection('registrations').where('status', '==', 'pending').get();
-    const registrations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const { data: registrations, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .eq('status', 'pending');
+      
+    if (error) throw error;
     res.json(registrations);
   } catch (error) {
     console.error('Error fetching registrations:', error);

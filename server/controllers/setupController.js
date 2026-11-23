@@ -1,4 +1,4 @@
-const { auth, db } = require('../config/firebase');
+const { supabase } = require('../config/supabase');
 
 const createSuperAdmin = async (req, res) => {
   const { email, password } = req.body;
@@ -9,30 +9,39 @@ const createSuperAdmin = async (req, res) => {
 
   try {
     // 1. Check if any super-admin already exists
-    const superAdminQuery = await db.collection('users').where('role', '==', 'super-admin').get();
-    if (!superAdminQuery.empty) {
+    const { data: existingAdmin, error: adminErr } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'super-admin')
+      .limit(1);
+
+    if (existingAdmin && existingAdmin.length > 0) {
       return res.status(400).json({ error: 'Super Admin already exists. Only one is allowed for initial setup.' });
     }
 
-    // 2. Create user in Firebase Auth
-    const userRecord = await auth.createUser({
+    // 2. Create user in Supabase Auth
+    const { data: authData, error: authErr } = await supabase.auth.signUp({
       email,
       password,
-      emailVerified: true,
-      displayName: 'Super Admin'
     });
 
-    // 3. Save role in Firestore
-    await db.collection('users').doc(userRecord.uid).set({
-      email,
-      role: 'super-admin',
-      createdAt: new Date(),
-      isInitialSetup: true
-    });
+    if (authErr) throw authErr;
+
+    // 3. Save role in DB
+    const { error: dbErr } = await supabase
+      .from('users')
+      .insert([{
+        auth_id: authData.user.id,
+        email,
+        role: 'super-admin',
+        is_initial_setup: true
+      }]);
+      
+    if (dbErr) throw dbErr;
 
     res.json({ 
       message: 'Super Admin created successfully',
-      uid: userRecord.uid 
+      uid: authData.user.id 
     });
   } catch (error) {
     console.error('Error creating super admin:', error);

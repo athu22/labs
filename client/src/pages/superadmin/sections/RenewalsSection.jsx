@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../services/firebase';
-import { collection, query, getDocs, doc, updateDoc, getDoc, orderBy } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import { CreditCard, Check, X, Loader2, History, User } from 'lucide-react';
 
 const RenewalsSection = () => {
@@ -15,9 +14,20 @@ const RenewalsSection = () => {
   const fetchRenewals = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'renewals'), orderBy('submittedAt', 'desc'));
-      const snap = await getDocs(q);
-      setRenewals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const { data, error } = await supabase
+        .from('renewals')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+
+      if (error) throw error;
+      setRenewals((data || []).map(item => ({
+        ...item,
+        registrationId: item.registrationId || item.registration_id,
+        memberName: item.memberName || item.member_name,
+        membershipId: item.membershipId || item.membership_id || item.email,
+        upiTransactionId: item.upiTransactionId || item.transaction_id,
+        paymentDate: item.paymentDate || item.payment_date,
+      })));
     } catch (e) {
       console.error(e);
     } finally {
@@ -28,29 +38,61 @@ const RenewalsSection = () => {
   const handleApprove = async (renewal) => {
     setProcessingId(renewal.id);
     try {
-      await updateDoc(doc(db, 'renewals', renewal.id), {
-        status: 'approved',
-        approvedAt: new Date()
-      });
+      const { error: renewErr } = await supabase
+        .from('renewals')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', renewal.id);
 
-      const memberRef = doc(db, 'registrations', renewal.registrationId);
-      const memberSnap = await getDoc(memberRef);
-      
-      if (memberSnap.exists()) {
-        const currentData = memberSnap.data();
-        const currentExpiry = currentData.expiryDate ? new Date(currentData.expiryDate) : new Date();
-        const newExpiry = new Date(currentExpiry);
-        newExpiry.setFullYear(newExpiry.getFullYear() + 1);
-        
-        await updateDoc(memberRef, {
-          expiryDate: newExpiry.toISOString().split('T')[0],
-          status: 'approved'
-        });
+      if (renewErr) throw renewErr;
+
+      if (renewal.registrationId) {
+        const { data: memberData } = await supabase
+          .from('registrations')
+          .select('*')
+          .eq('id', renewal.registrationId)
+          .single();
+
+        if (memberData) {
+          const existingExpiry = memberData.expiry_date || memberData.expiryDate;
+          const currentExpiry = existingExpiry ? new Date(existingExpiry) : new Date();
+          const newExpiry = new Date(currentExpiry);
+          newExpiry.setFullYear(newExpiry.getFullYear() + 1);
+
+          await supabase
+            .from('registrations')
+            .update({
+              expiry_date: newExpiry.toISOString().split('T')[0],
+              status: 'approved'
+            })
+            .eq('id', renewal.registrationId);
+        }
       }
       fetchRenewals();
     } catch (e) {
       console.error(e);
       alert('Error approving renewal');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (renewal) => {
+    if (!confirm('Reject this renewal request?')) return;
+    setProcessingId(renewal.id);
+    try {
+      const { error } = await supabase
+        .from('renewals')
+        .update({ status: 'rejected' })
+        .eq('id', renewal.id);
+
+      if (error) throw error;
+      fetchRenewals();
+    } catch (e) {
+      console.error(e);
+      alert('Error rejecting renewal');
     } finally {
       setProcessingId(null);
     }
@@ -140,7 +182,9 @@ const RenewalsSection = () => {
                             {processingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                           </button>
                           <button 
-                            className="bg-white hover:bg-rose-50 text-slate-300 hover:text-rose-600 border border-slate-200 hover:border-rose-200 p-2 rounded-lg transition-all active:scale-95"
+                            onClick={() => handleReject(item)}
+                            disabled={processingId === item.id}
+                            className="bg-white hover:bg-rose-50 text-slate-300 hover:text-rose-600 border border-slate-200 hover:border-rose-200 p-2 rounded-lg transition-all active:scale-95 disabled:opacity-50"
                             title="Reject"
                           >
                             <X size={14} />

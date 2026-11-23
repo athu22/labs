@@ -1,7 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db } from '../services/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
 
 const AuthContext = createContext();
 
@@ -19,25 +17,45 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserData(userDoc.data());
-        }
-      } else {
-        // Only clear if we're NOT in mock mode
-        if (!localStorage.getItem('mockUser')) {
-          setCurrentUser(null);
-          setUserData(null);
-        }
-      }
+    const fetchSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      await handleUser(session?.user);
       setLoading(false);
-    });
+    };
 
-    return unsubscribe;
+    fetchSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        await handleUser(session?.user);
+      }
+    );
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
+
+  const handleUser = async (user) => {
+    if (user) {
+      setCurrentUser(user);
+      const { data: userDoc, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .single();
+        
+      if (userDoc) {
+        setUserData(userDoc);
+      }
+    } else {
+      // Only clear if we're NOT in mock mode
+      if (!localStorage.getItem('mockUser')) {
+        setCurrentUser(null);
+        setUserData(null);
+      }
+    }
+  };
 
   const login = (user, data) => {
     setCurrentUser(user);
@@ -47,7 +65,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await auth.signOut();
+    await supabase.auth.signOut();
     setCurrentUser(null);
     setUserData(null);
     localStorage.removeItem('mockUser');

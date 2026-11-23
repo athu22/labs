@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { auth, db } from '../../services/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../../services/supabase';
 import { ShieldCheck, Key, Lock, ChevronRight, Loader2, ArrowLeft, Cpu, Activity } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -24,22 +22,31 @@ const SuperAdminLogin = () => {
     if (email === 'admin@aclap.org' && password === 'admin123') {
       console.log('Master Root Access Authorized');
       login({ uid: 'master-root', email: email }, { role: 'super-admin', adminId: 'ROOT-01' });
-      navigate('/super-admin');
+      navigate('/super-admin', { replace: true });
       setLoading(false);
       return;
     }
     
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === 'super-admin') {
-          login(userCredential.user, userData);
-          navigate('/super-admin');
+      if (authError) throw authError;
+
+      const { data: userDoc, error: docError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', authData.user.id)
+        .single();
+
+      if (userDoc) {
+        if (userDoc.role === 'super-admin') {
+          login(authData.user, userDoc);
+          navigate('/super-admin', { replace: true });
         } else {
-          await auth.signOut();
+          await supabase.auth.signOut();
           setError('Access Denied: Super Admin clearance required.');
         }
       } else {

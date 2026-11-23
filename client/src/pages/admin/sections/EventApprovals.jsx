@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../services/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import { Check, X, User, Calendar, CreditCard, Filter, Loader2, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
@@ -13,43 +12,65 @@ const EventApprovals = () => {
 
   const [events, setEvents] = useState([]);
 
+  const fetchAssignedData = async () => {
+    if (!currentUser?.email) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [
+        { data: eventsData, error: eventsErr },
+        { data: regsData, error: regsErr }
+      ] = await Promise.all([
+        supabase.from('events').select('*').eq('admin_email', currentUser.email),
+        supabase.from('event_registrations').select('*').eq('event_admin_email', currentUser.email)
+      ]);
+
+      if (eventsErr) console.error("Events fetch error:", eventsErr);
+      if (regsErr) console.error("Event regs fetch error:", regsErr);
+
+      setEvents(eventsData || []);
+      setRegistrations((regsData || []).map(reg => ({
+        ...reg,
+        fullName: reg.fullName || reg.full_name,
+        eventTitle: reg.eventTitle || reg.event_title,
+        transactionId: reg.transactionId || reg.transaction_id,
+      })));
+    } catch (error) {
+      console.error("Error fetching assigned events:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    fetchAssignedData();
+
     if (!currentUser?.email) return;
 
-    // Fetch assigned events
-    const eventsQ = query(
-      collection(db, 'events'),
-      where('adminEmail', '==', currentUser.email)
-    );
-    const unsubEvents = onSnapshot(eventsQ, (snapshot) => {
-      setEvents(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    // Only show registrations for events assigned to this admin
-    const q = query(
-      collection(db, 'event_registrations'),
-      where('eventAdminEmail', '==', currentUser.email)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setRegistrations(data);
-      setLoading(false);
-    });
+    const channel = supabase
+      .channel('admin-event-approvals')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_registrations' },
+        () => fetchAssignedData()
+      )
+      .subscribe();
 
     return () => {
-      unsubscribe();
-      unsubEvents();
+      supabase.removeChannel(channel);
     };
   }, [currentUser?.email]);
 
   const handleVerify = async (id) => {
     try {
-      await updateDoc(doc(db, 'event_registrations', id), {
-        status: 'verified', // Admin verifies, moves to Super Admin for final approval
-        verifiedByAdminAt: new Date(),
-        verifiedBy: currentUser.uid
-      });
+      const { error } = await supabase
+        .from('event_registrations')
+        .update({ status: 'verified' })
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchAssignedData();
     } catch (error) {
       console.error("Error verifying:", error);
       alert("Failed to verify registration.");
@@ -59,11 +80,13 @@ const EventApprovals = () => {
   const handleReject = async (id) => {
     if (confirm('Reject this event registration?')) {
       try {
-        await updateDoc(doc(db, 'event_registrations', id), {
-          status: 'rejected',
-          rejectedAt: new Date(),
-          rejectedBy: currentUser.uid
-        });
+        const { error } = await supabase
+          .from('event_registrations')
+          .update({ status: 'rejected' })
+          .eq('id', id);
+
+        if (error) throw error;
+        fetchAssignedData();
       } catch (error) {
         console.error("Error rejecting:", error);
       }

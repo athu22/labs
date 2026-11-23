@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
-import { db } from '../services/firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import usePreventBack from '../hooks/usePreventBack';
 import { LanguageContext } from '../context/LanguageContext';
 import {
    User, Shield, CreditCard, Clock, CheckCircle2,
@@ -10,6 +10,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import MembershipFormPDF from "../components/MembershipFormPDF"; // Import the PDF component
+import eventApi from '../services/eventApi';
 
 // Translations for Member Portal
 const translations = {
@@ -141,9 +142,12 @@ const translations = {
 
 const MemberPortal = () => {
    const { currentUser, userData } = useAuth();
+   usePreventBack(Boolean(currentUser));
    const { language } = useContext(LanguageContext);
    const t = translations[language];
    const [registration, setRegistration] = useState(null);
+   const [myTickets, setMyTickets] = useState([]);
+   const [loadingTickets, setLoadingTickets] = useState(false);
    const [loading, setLoading] = useState(true);
    const [isPrinting, setIsPrinting] = useState(false);
    const printRef = useRef();
@@ -151,16 +155,61 @@ const MemberPortal = () => {
 
    useEffect(() => {
       const fetchMemberData = async () => {
-         if (!currentUser) return;
+         if (!currentUser) {
+            setLoading(false);
+            return;
+         }
          try {
-            const q = query(
-               collection(db, 'registrations'),
-               where('uid', '==', currentUser.uid),
-               limit(1)
-            );
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-               setRegistration({ id: snap.docs[0].id, ...snap.docs[0].data() });
+            const userId = currentUser.id || currentUser.uid;
+            const isUuid =
+               typeof userId === 'string' &&
+               /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+            let row = null;
+
+            if (isUuid) {
+               const { data } = await supabase
+                  .from('registrations')
+                  .select('*')
+                  .eq('uid', userId)
+                  .limit(1);
+               if (data && data.length > 0) row = data[0];
+            }
+
+            if (!row && currentUser.email) {
+               const { data } = await supabase
+                  .from('registrations')
+                  .select('*')
+                  .eq('email', currentUser.email)
+                  .limit(1);
+               if (data && data.length > 0) row = data[0];
+            }
+
+            if (row) {
+               setRegistration({
+                  ...row,
+                  fullName:
+                     row.fullName ||
+                     row.full_name ||
+                     [row.firstName || row.first_name, row.fatherName || row.father_name, row.surname || row.last_name]
+                        .filter(Boolean)
+                        .join(' '),
+                  registrationNo: row.registrationNo || row.registration_no,
+                  officePhone: row.officePhone || row.office_phone,
+                  profilePhoto: row.profilePhoto || row.profile_photo,
+                  degreeCertificate: row.degreeCertificate || row.degree_certificate,
+                  approvedAt: row.approvedAt || row.approved_at,
+               });
+            }
+
+            // Fetch member's registered event tickets
+            try {
+               setLoadingTickets(true);
+               const ticketRes = await eventApi.get('/my-registrations');
+               setMyTickets(ticketRes.data || []);
+            } catch (err) {
+               console.warn('[MemberPortal] Tickets fetch failed:', err);
+            } finally {
+               setLoadingTickets(false);
             }
          } catch (err) {
             console.error(err);
@@ -376,6 +425,51 @@ const MemberPortal = () => {
                                  </button>
                               </div>
                            </div>
+
+                            {/* My Event Tickets & Passes */}
+                            {myTickets.length > 0 && (
+                              <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm space-y-6">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                  <div>
+                                    <h3 className="text-lg font-black text-slate-900 tracking-tight">My Event Tickets</h3>
+                                    <p className="text-xs text-slate-400">View and download your confirmed event passes and QR tickets</p>
+                                  </div>
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-primary-600 bg-primary-50 px-3 py-1 rounded-full">
+                                    {myTickets.length} Event(s)
+                                  </span>
+                                </div>
+
+                                <div className="divide-y divide-slate-100">
+                                  {myTickets.map((tRow) => {
+                                    const ticketCode = tRow.ticket?.ticket_code || tRow.registration_code;
+                                    const isPaid = tRow.payment_status === "paid";
+                                    return (
+                                      <div key={tRow.id} className="py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                        <div>
+                                          <h4 className="text-sm font-black text-slate-800">{tRow.event?.title || tRow.event_title}</h4>
+                                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                                            <span className="font-mono text-primary-600 font-bold">{ticketCode}</span>
+                                            <span>•</span>
+                                            <span>{tRow.event?.eventDate || tRow.event?.date || "Date TBD"}</span>
+                                            <span>•</span>
+                                            <span className={"text-[10px] font-black uppercase " + (isPaid ? "text-emerald-600" : "text-amber-600")}>
+                                              {tRow.payment_status}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <Link
+                                          to={"/ticket/" + ticketCode}
+                                          className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm shrink-0"
+                                        >
+                                          View Ticket
+                                        </Link>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                         </div>
                      )}
 
@@ -407,7 +501,7 @@ const MemberPortal = () => {
          </div>
 
          {/* Print CSS - Hidden in screen, visible in print */}
-         <style jsx>{`
+         <style>{`
             @media print {
                .print\\:block {
                   display: block !important;

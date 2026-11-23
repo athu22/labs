@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Award, Users, Calendar, CheckCircle, Newspaper, Bell, ArrowRight, ChevronLeft, ChevronRight, Globe, Shield, Sparkles, Zap, Heart, MessageSquare, MapPin, Clock, Loader2 } from 'lucide-react';
+import { Award, Users, Calendar, CheckCircle, Newspaper, Bell, ArrowRight, ChevronLeft, ChevronRight, Globe, Shield, Sparkles, Zap, Heart, MessageSquare, MapPin, Clock, Loader2, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { db } from '../services/firebase';
-import { collection, doc, getDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
 import { LanguageContext } from '../context/LanguageContext';
 import img1 from '../assets/img1.jpeg';
-
-// Import single banner image from assets
+import event1 from '../assets/event1.jpeg';
+import event2 from '../assets/event2.jpeg';
+import event3 from '../assets/event3.jpeg';
 import banner from '../assets/banner.jpeg';
 
 // Translations for Home Page
@@ -152,6 +152,93 @@ const translations = {
   }
 };
 
+const formatEventDate = (ev, lang = 'en') => {
+  if (!ev) return '';
+
+  // 1. If ev already has a valid formatted display date, return it directly
+  if (typeof ev.displayDate === 'string' && ev.displayDate.trim() && !/invalid/i.test(ev.displayDate)) {
+    return ev.displayDate.trim();
+  }
+
+  const rawDate = ev.event_date || ev.eventDate || ev.date || ev.startDate || ev.start_date;
+  const rawEndDate = ev.event_end_date || ev.eventEndDate || ev.endDate || ev.end_date;
+
+  if (!rawDate && !rawEndDate) {
+    return lang === 'mr' ? 'आगामी तारीख' : 'Upcoming Date';
+  }
+
+  const locale = lang === 'mr' ? 'mr-IN' : 'en-IN';
+  const opt = { day: '2-digit', month: 'short', year: 'numeric' };
+
+  // 2. If rawDate contains a range string like "19 Jan 2027 - 20 Jan 2027" or "2027-01-19 to 2027-01-20"
+  if (typeof rawDate === 'string') {
+    const separator = rawDate.includes(' to ') ? ' to ' : (rawDate.includes(' - ') ? ' - ' : null);
+    if (separator) {
+      const [sPart, ePart] = rawDate.split(separator);
+      const ds = new Date(sPart.trim());
+      const de = new Date(ePart.trim());
+      if (!isNaN(ds.getTime()) && !isNaN(de.getTime())) {
+        return lang === 'mr'
+          ? `${ds.toLocaleDateString(locale, opt)} ते ${de.toLocaleDateString(locale, opt)}`
+          : `${ds.toLocaleDateString(locale, opt)} - ${de.toLocaleDateString(locale, opt)}`;
+      }
+      return rawDate.trim();
+    }
+  }
+
+  const parseD = (s) => {
+    if (!s) return null;
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const d1 = parseD(rawDate);
+  const d2 = parseD(rawEndDate);
+
+  if (d1 && d2 && d1.getTime() !== d2.getTime()) {
+    const s1 = d1.toLocaleDateString(locale, opt);
+    const s2 = d2.toLocaleDateString(locale, opt);
+    return lang === 'mr' ? `${s1} ते ${s2}` : `${s1} - ${s2}`;
+  }
+
+  if (d1) {
+    return d1.toLocaleDateString(locale, opt);
+  }
+
+  if (typeof rawDate === 'string' && rawDate.trim() && !/invalid/i.test(rawDate)) {
+    return rawDate.trim();
+  }
+
+  return lang === 'mr' ? 'आगामी तारीख' : 'Upcoming Date';
+};
+
+const formatEventTime = (ev) => {
+  if (!ev) return '09:00 AM - 05:00 PM';
+  const formatT = (t) => {
+    if (!t) return '';
+    if (/AM|PM/i.test(t)) return t;
+    const parts = String(t).split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      const m = parts[1];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12;
+      if (h === 0) h = 12;
+      return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+    }
+    return t;
+  };
+
+  const st = ev.start_time || ev.startTime;
+  const et = ev.end_time || ev.endTime;
+  if (st && et) {
+    return `${formatT(st)} - ${formatT(et)}`;
+  }
+  if (st) return formatT(st);
+  if (ev.time && typeof ev.time === 'string') return ev.time;
+  return '09:00 AM - 05:00 PM';
+};
+
 const Home = () => {
   const { language } = useContext(LanguageContext);
   const t = translations[language];
@@ -167,60 +254,202 @@ const Home = () => {
   const [realMemberCount, setRealMemberCount] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [upcomingEvent, setUpcomingEvent] = useState(null);
+  const [featuredEvents, setFeaturedEvents] = useState([]);
   const [bannerLoading, setBannerLoading] = useState(true);
 
-  const slides = [
+  // Modern presentation: Clean high-res conference photography for text slides,
+  // and pure unobstructed poster showcase for official banner.jpeg
+  const defaultSlides = useMemo(() => [
     {
-      image: banner,
+      id: 'default-1',
+      image: event1, // Conference auditorium with delegates
       tagline: t.heroTagline1,
       title: t.heroTitle1,
       subtitle: t.heroSubtitle1,
       primaryCTA: t.primaryCTA1,
-      secondaryCTA: t.secondaryCTA1
+      secondaryCTA: t.secondaryCTA1,
+      primaryLink: '/signup',
+      secondaryLink: '/about',
+      isEventSlide: false,
     },
     {
-      image: banner,
+      id: 'default-2',
+      image: event2, // Conference stage & expert panel
       tagline: t.heroTagline2,
       title: t.heroTitle2,
       subtitle: t.heroSubtitle2,
       primaryCTA: t.primaryCTA2,
-      secondaryCTA: t.secondaryCTA2
+      secondaryCTA: t.secondaryCTA2,
+      primaryLink: '/events',
+      secondaryLink: '/news',
+      isEventSlide: false,
     },
     {
-      image: banner,
+      id: 'default-3',
+      image: event3, // Clinical diagnostics seminar
       tagline: t.heroTagline3,
       title: t.heroTitle3,
       subtitle: t.heroSubtitle3,
       primaryCTA: t.primaryCTA3,
-      secondaryCTA: t.secondaryCTA3
+      secondaryCTA: t.secondaryCTA3,
+      primaryLink: '/portal',
+      secondaryLink: '/contact',
+      isEventSlide: false,
+    },
+    {
+      id: 'default-banner',
+      image: banner, // Official ACLAP Association poster graphic
+      isBannerShowcase: true,
+      tagline: language === 'mr' ? 'महाराष्ट्र राज्य अधिकृत संघटना' : 'OFFICIAL STATE ASSOCIATION • MAHARASHTRA',
+      title: '',
+      subtitle: '',
+      primaryCTA: t.primaryCTA1,
+      secondaryCTA: t.secondaryCTA1,
+      primaryLink: '/signup',
+      secondaryLink: '/about',
+      isEventSlide: false,
     }
-  ];
+  ], [t, language]);
+
+  const slides = useMemo(() => {
+    if (!featuredEvents || featuredEvents.length === 0) {
+      return defaultSlides;
+    }
+
+    const eventSlides = featuredEvents.map((ev) => {
+      const img = ev.imageUrl || ev.image_url || (Array.isArray(ev.imageUrls) ? ev.imageUrls[0] : null) || banner;
+      const formattedDate = formatEventDate(ev, language);
+      const venueStr = ev.venue || ev.location || ev.address || 'Maharashtra';
+      const timeStr = formatEventTime(ev);
+
+      // Filter out test/short placeholder descriptions (e.g. "sjsj")
+      const rawDesc = (ev.description || '').trim();
+      const cleanDesc = (rawDesc.length > 15 && !/^([a-z])\1+$/i.test(rawDesc)) ? rawDesc : '';
+
+      return {
+        id: `feat-${ev.id}`,
+        eventId: ev.id,
+        isEventSlide: true,
+        image: img,
+        tagline: language === 'mr' ? '⭐ महत्त्वाचा कार्यक्रम • विशेष नोंदणी सुरू' : '⭐ FEATURED IMPORTANT EVENT • REGISTRATION OPEN',
+        title: ev.title,
+        eventDateFormatted: formattedDate,
+        venue: venueStr,
+        eventTime: timeStr,
+        description: cleanDesc,
+        primaryCTA: language === 'mr' ? 'आता नोंदणी करा' : 'Register Now',
+        secondaryCTA: language === 'mr' ? 'सविस्तर माहिती' : 'Event Details',
+        primaryLink: `/event-registration/${ev.id}`,
+        secondaryLink: `/events`,
+      };
+    });
+
+    return [...eventSlides, ...defaultSlides];
+  }, [featuredEvents, defaultSlides, language]);
 
   useEffect(() => {
     fetchHomeData();
+  }, []);
+
+  useEffect(() => {
+    if (!slides || slides.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides.length);
     }, 8000);
     return () => clearInterval(timer);
-  }, []);
+  }, [slides.length]);
 
   const fetchHomeData = async () => {
     try {
-      const mainSnap = await getDoc(doc(db, 'content', 'main'));
-      if (mainSnap.exists()) setContent(mainSnap.data());
+      const { data: mainSnap } = await supabase.from('content').select('*').eq('id', 'main').single();
+      if (mainSnap) setContent({
+        heroTitle: mainSnap.hero_title,
+        heroSubtext: mainSnap.hero_subtext,
+        memberCountOffset: mainSnap.member_count_offset
+      });
 
-      const newsSnap = await getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc'), limit(3)));
-      setNews(newsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const { data: newsSnap } = await supabase.from('news').select('*').order('created_at', { ascending: false }).limit(3);
+      if (newsSnap) setNews(newsSnap.map(n => ({ ...n, createdAt: new Date(n.created_at) })));
 
-      const noticesSnap = await getDocs(query(collection(db, 'notices'), orderBy('createdAt', 'desc'), limit(5)));
-      setNotices(noticesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const { data: noticesSnap } = await supabase.from('notices').select('*').order('created_at', { ascending: false }).limit(5);
+      if (noticesSnap) setNotices(noticesSnap.map(n => ({ ...n, createdAt: new Date(n.created_at) })));
 
-      const membersSnap = await getDocs(collection(db, 'registrations'));
-      setRealMemberCount(membersSnap.size);
+      const { count } = await supabase.from('registrations').select('*', { count: 'exact', head: true });
+      if (count !== null) setRealMemberCount(count);
 
-      const eventsSnap = await getDocs(query(collection(db, 'events'), orderBy('date', 'desc'), limit(1)));
-      if (!eventsSnap.empty) {
-        setUpcomingEvent({ id: eventsSnap.docs[0].id, ...eventsSnap.docs[0].data() });
+      // 1. Read featured event IDs from content table banner_url
+      let featuredIds = [];
+      if (mainSnap?.banner_url) {
+        try {
+          const parsed = JSON.parse(mainSnap.banner_url);
+          if (Array.isArray(parsed)) featuredIds = parsed;
+        } catch (_) {}
+      }
+
+      // 2. Fetch published events
+      let { data: eventsSnap } = await supabase
+        .from('events')
+        .select('*')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false });
+
+      if (!eventsSnap || eventsSnap.length === 0) {
+        const anySnap = await supabase
+          .from('events')
+          .select('*')
+          .order('created_at', { ascending: false });
+        eventsSnap = anySnap.data || [];
+      }
+
+      const allEventsList = eventsSnap || [];
+
+      // 3. Filter featured/important events for Hero Slider
+      const featured = allEventsList.filter((ev) =>
+        Boolean(ev.is_featured || ev.isFeatured || (Array.isArray(featuredIds) && featuredIds.includes(ev.id)))
+      );
+      setFeaturedEvents(featured);
+
+      // 4. Set upcomingEvent for the "NEXT BIG EVENT" section
+      if (allEventsList.length > 0) {
+        const ev = featured.length > 0 ? featured[0] : allEventsList[0];
+        const eventImg =
+          ev.imageUrl ||
+          ev.image_url ||
+          (Array.isArray(ev.imageUrls) ? ev.imageUrls[0] : null) ||
+          banner;
+
+        const rawDate = ev.event_date || ev.eventDate || ev.date;
+        let formattedDateString = '';
+        if (rawDate) {
+          if (typeof rawDate === 'string' && rawDate.includes(' to ')) {
+            const [s, e] = rawDate.split(' to ');
+            const ds = new Date(s.trim());
+            const de = new Date(e.trim());
+            if (!isNaN(ds.getTime()) && !isNaN(de.getTime())) {
+              formattedDateString = `${ds.toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} - ${de.toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+            } else {
+              formattedDateString = rawDate;
+            }
+          } else {
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+              formattedDateString = d.toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+            } else {
+              formattedDateString = String(rawDate);
+            }
+          }
+        }
+
+        setUpcomingEvent({
+          ...ev,
+          imageUrl: eventImg,
+          image_url: eventImg,
+          displayDate: formattedDateString,
+          location: ev.venue || ev.location || ev.address || 'Designated Venue',
+          time: (ev.start_time && ev.end_time)
+            ? `${ev.start_time} - ${ev.end_time}`
+            : (ev.start_time || ev.time || '09:00 AM - 05:00 PM'),
+        });
       }
     } catch (e) {
       console.error(e);
@@ -254,143 +483,234 @@ const Home = () => {
     <div className="relative overflow-hidden bg-white text-slate-900">
 
       {/* Hero Slider */}
-      <section className="relative h-screen w-full overflow-hidden bg-[#140303]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentSlide}
-            initial={{ opacity: 0, scale: 1.1 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="absolute inset-0 z-0"
-          >
+      {(() => {
+        const safeIndex = currentSlide % (slides.length || 1);
+        const activeSlide = slides[safeIndex] || slides[0] || {};
+
+        return (
+          <section className="relative h-screen w-full overflow-hidden bg-slate-950">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={safeIndex}
+                initial={{ opacity: 0, scale: 1.05 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.8, ease: "easeInOut" }}
+                className="absolute inset-0 z-0"
+              >
+                {/* Background Image Layer */}
+                <motion.div
+                  initial={{ scale: 1.15 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 8, ease: "easeOut" }}
+                  className="absolute inset-0 bg-cover bg-center"
+                  style={{ backgroundImage: `url(${activeSlide.image || event1})` }}
+                >
+                  {/* High contrast, cinematic overlay tailored to slide type */}
+                  {activeSlide.isBannerShowcase ? (
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/20" />
+                  ) : activeSlide.isEventSlide ? (
+                    <>
+                      <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[1px]" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/70" />
+                    </>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-slate-950/60" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/70" />
+                    </>
+                  )}
+                </motion.div>
+
+                <div className="relative h-full max-w-7xl mx-auto px-4 flex flex-col items-center justify-center text-center z-10">
+                  <motion.div
+                    initial={{ opacity: 0, y: 40 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
+                    className="max-w-5xl"
+                  >
+                    <motion.div
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 48 }}
+                      transition={{ delay: 0.5, duration: 0.6 }}
+                      className="h-[1px] w-12 bg-secondary-yellow/60 mx-auto mb-6"
+                    />
+
+                    {/* Tagline / Badge */}
+                    <motion.div
+                      initial={{ opacity: 0, letterSpacing: "0.5em" }}
+                      animate={{ opacity: 1, letterSpacing: "0.3em" }}
+                      transition={{ delay: 0.6, duration: 0.5 }}
+                      className="text-secondary-yellow text-[10px] md:text-xs font-black uppercase tracking-[0.3em] inline-flex flex-wrap items-center justify-center gap-2 mb-6"
+                    >
+                      {activeSlide.isEventSlide && (
+                        <span className="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-amber-500/30">
+                          <Star size={12} className="fill-slate-950" /> Important Event
+                        </span>
+                      )}
+                      <span>{activeSlide.tagline}</span>
+                    </motion.div>
+
+                    {/* Banner Showcase Slide: Let the poster graphic shine without giant overlapping title */}
+                    {activeSlide.isBannerShowcase ? (
+                      <div className="my-8 md:my-14">
+                        <div className="inline-block px-6 py-2.5 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/20 text-white/95 text-xs md:text-sm font-semibold mb-8 shadow-xl">
+                          {language === 'mr' ? 'महाराष्ट्रभरातील प्रयोगशाळा व्यावसायिकांचे अधिकृत व्यासपीठ' : 'Empowering Clinical Laboratory Professionals Across Maharashtra'}
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 mt-4">
+                          <Link
+                            to="/signup"
+                            className="w-full sm:w-auto justify-center px-8 sm:px-12 py-3.5 sm:py-4 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 text-white text-xs font-black uppercase tracking-[0.2em] rounded-2xl shadow-2xl flex items-center gap-3 transition-all"
+                          >
+                            <span>{t.primaryCTA1}</span> <ArrowRight size={16} />
+                          </Link>
+                          <Link
+                            to="/about"
+                            className="w-full sm:w-auto justify-center px-8 sm:px-12 py-3.5 sm:py-4 bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-black uppercase tracking-[0.2em] rounded-2xl backdrop-blur-md transition-all text-center"
+                          >
+                            {t.secondaryCTA1}
+                          </Link>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Title */}
+                        <motion.h1
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.7, duration: 0.6 }}
+                          className="text-3xl sm:text-5xl md:text-7xl font-black text-white mb-4 sm:mb-8 leading-[1.15] sm:leading-[1.1] tracking-tight whitespace-pre-line drop-shadow-2xl"
+                        >
+                          {activeSlide.title}
+                        </motion.h1>
+
+                        {/* Event Metadata Capsule */}
+                        {activeSlide.isEventSlide ? (
+                          <motion.div
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.85, duration: 0.6 }}
+                            className="flex flex-col items-center mb-10"
+                          >
+                            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-4 mb-4">
+                              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-xs md:text-sm font-semibold shadow-lg">
+                                <Calendar size={15} className="text-secondary-yellow" />
+                                <span>{activeSlide.eventDateFormatted}</span>
+                              </div>
+                              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-xs md:text-sm font-semibold shadow-lg">
+                                <MapPin size={15} className="text-secondary-yellow" />
+                                <span className="uppercase">{activeSlide.venue}</span>
+                              </div>
+                              {activeSlide.eventTime && (
+                                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-xs md:text-sm font-semibold shadow-lg">
+                                  <Clock size={15} className="text-secondary-yellow" />
+                                  <span>{activeSlide.eventTime}</span>
+                                </div>
+                              )}
+                            </div>
+                            {activeSlide.description && (
+                              <p className="text-white/80 text-sm md:text-base max-w-xl mx-auto italic font-normal">
+                                "{activeSlide.description}"
+                              </p>
+                            )}
+                          </motion.div>
+                        ) : (
+                          <motion.p
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.9, duration: 0.6 }}
+                            className="text-base md:text-xl text-white/80 mb-10 leading-relaxed font-medium max-w-2xl mx-auto tracking-wide"
+                          >
+                            {activeSlide.subtitle}
+                          </motion.p>
+                        )}
+
+                        {/* CTA Buttons */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 1.05, duration: 0.6 }}
+                          className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 relative z-20 w-full sm:w-auto"
+                        >
+                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
+                            <Link
+                              to={activeSlide.primaryLink || '/signup'}
+                              className={
+                                activeSlide.isEventSlide
+                                  ? "w-full sm:w-auto justify-center px-8 sm:px-12 py-3.5 sm:py-4 bg-gradient-to-r from-secondary-yellow to-amber-400 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-secondary-yellow/30 flex items-center gap-3"
+                                  : "w-full sm:w-auto justify-center group relative px-8 sm:px-14 py-3.5 sm:py-5 bg-white text-primary-600 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl flex items-center gap-3 overflow-hidden"
+                              }
+                            >
+                              <span className="relative z-10 flex items-center gap-3">
+                                {activeSlide.primaryCTA} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                              </span>
+                              {!activeSlide.isEventSlide && (
+                                <motion.div
+                                  initial={{ y: "100%" }}
+                                  whileHover={{ y: 0 }}
+                                  transition={{ duration: 0.3 }}
+                                  className="absolute inset-0 bg-secondary-yellow"
+                                />
+                              )}
+                            </Link>
+                          </motion.div>
+                          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
+                            <Link
+                              to={activeSlide.secondaryLink || '/about'}
+                              className="w-full sm:w-auto block text-center px-8 sm:px-14 py-3.5 sm:py-5 bg-transparent border-2 border-white/20 text-white hover:bg-white/10 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all backdrop-blur-md"
+                            >
+                              {activeSlide.secondaryCTA}
+                            </Link>
+                          </motion.div>
+                        </motion.div>
+                      </>
+                    )}
+                  </motion.div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
             <motion.div
-              initial={{ scale: 1.2 }}
-              animate={{ scale: 1 }}
-              transition={{ duration: 8, ease: "easeOut" }}
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${slides[currentSlide].image})` }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.3, duration: 0.5 }}
+              className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-20"
             >
-              <div className="absolute inset-0 bg-[#f16522]/30 mix-blend-multiply" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#140303] via-transparent to-[#140303]/40" />
+              {slides.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`transition-all duration-300 rounded-full ${safeIndex === idx
+                    ? 'w-10 h-1.5 bg-secondary-yellow'
+                    : 'w-1.5 h-1.5 bg-white/40 hover:bg-white/60'
+                    }`}
+                />
+              ))}
             </motion.div>
 
-            <div className="relative h-full max-w-7xl mx-auto px-2 flex flex-col items-center justify-center text-center z-10">
-              <motion.div
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
-                className="max-w-5xl"
-              >
-                <motion.div
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 48 }}
-                  transition={{ delay: 0.5, duration: 0.6 }}
-                  className="h-[1px] w-12 bg-secondary-yellow/40 mx-auto mb-6"
-                />
-
-                <motion.span
-                  initial={{ opacity: 0, letterSpacing: "0.5em" }}
-                  animate={{ opacity: 1, letterSpacing: "0.3em" }}
-                  transition={{ delay: 0.6, duration: 0.5 }}
-                  className="text-secondary-yellow text-[10px] font-black uppercase tracking-[0.3em] block mb-6"
-                >
-                  {slides[currentSlide].tagline}
-                </motion.span>
-
-                <motion.h1
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7, duration: 0.6 }}
-                  className="text-4xl md:text-7xl font-black text-white mb-8 leading-[1.1] tracking-tight whitespace-pre-line drop-shadow-2xl"
-                >
-                  {slides[currentSlide].title}
-                </motion.h1>
-
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.9, duration: 0.6 }}
-                  className="text-base md:text-xl text-white/80 mb-12 leading-relaxed font-medium max-w-2xl mx-auto tracking-wide"
-                >
-                  {slides[currentSlide].subtitle}
-                </motion.p>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.1, duration: 0.6 }}
-                  className="flex flex-col sm:flex-row items-center justify-center gap-6 relative z-20"
-                >
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Link
-                      to="/signup"
-                      className="group relative px-14 py-5 bg-white text-primary-600 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl flex items-center gap-3 overflow-hidden"
-                    >
-                      <span className="relative z-10 flex items-center gap-3">
-                        {slides[currentSlide].primaryCTA} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </span>
-                      <motion.div
-                        initial={{ y: "100%" }}
-                        whileHover={{ y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="absolute inset-0 bg-secondary-yellow"
-                      />
-                    </Link>
-                  </motion.div>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Link
-                      to="/about"
-                      className="px-14 py-5 bg-transparent border-2 border-white/20 text-white hover:bg-white/10 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all backdrop-blur-md"
-                    >
-                      {slides[currentSlide].secondaryCTA}
-                    </Link>
-                  </motion.div>
-                </motion.div>
-              </motion.div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.3, duration: 0.5 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-20"
-        >
-          {slides.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentSlide(idx)}
-              className={`transition-all duration-300 rounded-full ${currentSlide === idx
-                ? 'w-10 h-1.5 bg-secondary-yellow'
-                : 'w-1.5 h-1.5 bg-white/40 hover:bg-white/60'
-                }`}
-            />
-          ))}
-        </motion.div>
-
-        <motion.button
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 1.2, duration: 0.5 }}
-          whileHover={{ scale: 1.1, x: -5 }}
-          onClick={() => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)}
-          className="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all z-20"
-        >
-          <ChevronLeft size={20} />
-        </motion.button>
-        <motion.button
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 1.2, duration: 0.5 }}
-          whileHover={{ scale: 1.1, x: 5 }}
-          onClick={() => setCurrentSlide((prev) => (prev + 1) % slides.length)}
-          className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all z-20"
-        >
-          <ChevronRight size={20} />
-        </motion.button>
-      </section>
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.2, duration: 0.5 }}
+              whileHover={{ scale: 1.1, x: -5 }}
+              onClick={() => setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length)}
+              className="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all z-20"
+            >
+              <ChevronLeft size={20} />
+            </motion.button>
+            <motion.button
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.2, duration: 0.5 }}
+              whileHover={{ scale: 1.1, x: 5 }}
+              onClick={() => setCurrentSlide((prev) => (prev + 1) % slides.length)}
+              className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/20 transition-all z-20"
+            >
+              <ChevronRight size={20} />
+            </motion.button>
+          </section>
+        );
+      })()}
 
       {/* Stats Section */}
       <motion.section
@@ -423,11 +743,11 @@ const Home = () => {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: "-50px" }}
-        className="py-32 bg-[#fdfcf5] relative overflow-hidden"
+        className="py-16 sm:py-24 md:py-32 bg-[#fdfcf5] relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-secondary-yellow/10 rounded-full blur-[120px] -mr-64 -mt-64" />
-        <div className="max-w-7xl mx-auto px-2 relative z-10">
-          <div className="text-center mb-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+          <div className="text-center mb-12 sm:mb-20">
             <motion.span
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -441,7 +761,7 @@ const Home = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.1 }}
-              className="text-5xl md:text-7xl font-black text-accent-maroon tracking-tighter leading-tight mb-6"
+              className="text-3xl sm:text-5xl md:text-7xl font-black text-accent-maroon tracking-tight leading-tight mb-4 sm:mb-6"
             >
               {t.whyJoin} <span className="text-primary-600">{t.aclap}</span>
             </motion.h2>
@@ -544,9 +864,9 @@ const Home = () => {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.1 }}
-                  className="text-5xl md:text-7xl font-black text-accent-maroon tracking-tighter leading-tight"
+                  className="text-3xl sm:text-5xl md:text-7xl font-black text-accent-maroon tracking-tight leading-tight"
                 >
-                  <br /> <span className="text-primary-600">{t.memoryName}</span>
+                  <span className="text-primary-600">{t.memoryName}</span>
                 </motion.h2>
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -623,7 +943,7 @@ const Home = () => {
                   >
                     <Sparkles size={16} /> {t.knowledgeHub}
                   </motion.div>
-                  <h2 className="text-5xl md:text-6xl font-black text-accent-maroon tracking-tighter leading-none">{t.latestIntel}</h2>
+                  <h2 className="text-3xl sm:text-4xl md:text-6xl font-black text-accent-maroon tracking-tight leading-tight">{t.latestIntel}</h2>
                 </motion.div>
                 <motion.div variants={fadeInUp}>
                   <Link to="/news" className="text-primary-600 text-[11px] font-black uppercase tracking-[0.2em] border-b-2 border-primary-600 pb-1 hover:text-accent-maroon hover:border-accent-maroon transition-all">{t.exploreAllNews}</Link>
@@ -652,9 +972,9 @@ const Home = () => {
                         whileHover={{ scale: 1.1 }}
                         className="block text-4xl font-black text-secondary-yellow group-hover:text-primary-600 transition-colors leading-none"
                       >
-                        {item.createdAt?.toDate().getDate()}
+                        {item.createdAt?.getDate?.() || new Date(item.createdAt).getDate()}
                       </motion.span>
-                      <span className="text-[11px] font-black uppercase text-slate-300 tracking-widest">{item.createdAt?.toDate().toLocaleString(language === 'mr' ? 'mr-IN' : 'en-US', { month: 'short' })}</span>
+                      <span className="text-[11px] font-black uppercase text-slate-300 tracking-widest">{((item.createdAt?.toLocaleString) ? item.createdAt : new Date(item.createdAt)).toLocaleString(language === 'mr' ? 'mr-IN' : 'en-US', { month: 'short' })}</span>
                     </motion.div>
                     <div className="flex-grow">
                       <h3 className="text-3xl font-bold text-accent-maroon mb-4 group-hover:text-primary-600 transition-colors leading-tight tracking-tight">{item.title}</h3>
@@ -715,7 +1035,7 @@ const Home = () => {
                         >
                           {notice.priority === 'Urgent' ? t.urgent : notice.priority}
                         </motion.span>
-                        <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">{notice.createdAt?.toDate().toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short' })}</span>
+                        <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest">{((notice.createdAt?.toLocaleDateString) ? notice.createdAt : new Date(notice.createdAt)).toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short' })}</span>
                       </div>
                       <h4 className="text-slate-800 font-bold group-hover:text-primary-600 transition-colors text-lg leading-snug">{notice.title}</h4>
                     </motion.div>
@@ -777,40 +1097,22 @@ const Home = () => {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="relative w-full h-[600px] overflow-hidden flex items-center justify-center"
+          className="relative w-full min-h-[500px] py-16 sm:py-24 md:h-[600px] overflow-hidden flex items-center justify-center bg-slate-950"
         >
-          <div className="absolute inset-0 z-0">
-            {upcomingEvent.imageUrl || (upcomingEvent.imageUrls && upcomingEvent.imageUrls.length > 0) ? (
-              <>
-                {bannerLoading && (
-                  <div className="absolute inset-0 bg-slate-900 animate-pulse flex items-center justify-center">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    >
-                      <Loader2 className="text-primary-600 animate-spin" size={40} />
-                    </motion.div>
-                  </div>
-                )}
-                <motion.img
-                  initial={{ scale: 1.1, opacity: 0 }}
-                  animate={{ scale: 1, opacity: bannerLoading ? 0 : 1 }}
-                  transition={{ duration: 1.5 }}
-                  src={upcomingEvent.imageUrl || upcomingEvent.imageUrls[0]}
-                  alt={upcomingEvent.title}
-                  onLoad={() => setBannerLoading(false)}
-                  className="w-full h-full object-cover"
-                />
-              </>
-            ) : (
-              <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                <Calendar className="w-32 h-32 text-slate-800" strokeWidth={1} />
-              </div>
-            )}
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/80 to-slate-900" />
+          <div className="absolute inset-0 z-0 overflow-hidden">
+            <img
+              src={upcomingEvent.imageUrl || upcomingEvent.image_url || event1 || banner}
+              alt={upcomingEvent.title || 'Event Banner'}
+              onError={(e) => {
+                e.currentTarget.src = event1;
+              }}
+              className="w-full h-full object-cover transition-transform duration-1000 scale-100 hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-slate-950/70" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/50 to-slate-950/80" />
           </div>
 
-          <div className="relative z-10 max-w-4xl mx-auto px-2 text-center">
+          <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -822,7 +1124,7 @@ const Home = () => {
                 whileInView={{ scale: 1, opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-3 mb-8 px-4 py-1.5 bg-primary-600/20 border border-primary-600/30 rounded-full backdrop-blur-md"
+                className="inline-flex items-center gap-3 mb-6 sm:mb-8 px-4 py-1.5 bg-primary-600/20 border border-primary-600/30 rounded-full backdrop-blur-md"
               >
                 <motion.span
                   animate={{ scale: [1, 1.2, 1] }}
@@ -837,7 +1139,7 @@ const Home = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.3 }}
-                className="text-5xl md:text-8xl font-black text-white mb-8 tracking-tighter leading-[1.1]"
+                className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-white mb-6 sm:mb-8 tracking-tight leading-tight"
               >
                 {upcomingEvent.title}
               </motion.h2>
@@ -847,21 +1149,21 @@ const Home = () => {
                 whileInView={{ opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
-                className="flex flex-wrap items-center justify-center gap-8 mb-12 text-white/70"
+                className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 mb-8 sm:mb-12 text-white/80"
               >
-                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-3">
-                  <Calendar size={22} className="text-primary-500" />
-                  <span className="text-base font-bold uppercase tracking-widest">
-                    {new Date(upcomingEvent.date).toLocaleDateString(language === 'mr' ? 'mr-IN' : 'en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-2 sm:gap-3">
+                  <Calendar size={18} className="text-secondary-yellow sm:w-[22px] sm:h-[22px]" />
+                  <span className="text-xs sm:text-base font-bold uppercase tracking-wider sm:tracking-widest">
+                    {upcomingEvent.displayDate || formatEventDate(upcomingEvent, language)}
                   </span>
                 </motion.div>
-                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-3">
-                  <MapPin size={22} className="text-primary-500" />
-                  <span className="text-base font-bold uppercase tracking-widest">{upcomingEvent.location}</span>
+                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-2 sm:gap-3">
+                  <MapPin size={18} className="text-secondary-yellow sm:w-[22px] sm:h-[22px]" />
+                  <span className="text-xs sm:text-base font-bold uppercase tracking-wider sm:tracking-widest">{upcomingEvent.venue || upcomingEvent.location || upcomingEvent.address || 'Venue TBA'}</span>
                 </motion.div>
-                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-3">
-                  <Clock size={22} className="text-primary-500" />
-                  <span className="text-base font-bold uppercase tracking-widest">{upcomingEvent.time || '09:00 AM - 05:00 PM'}</span>
+                <motion.div whileHover={{ y: -3 }} className="flex items-center gap-2 sm:gap-3">
+                  <Clock size={18} className="text-secondary-yellow sm:w-[22px] sm:h-[22px]" />
+                  <span className="text-xs sm:text-base font-bold uppercase tracking-wider sm:tracking-widest">{formatEventTime(upcomingEvent)}</span>
                 </motion.div>
               </motion.div>
 
@@ -870,20 +1172,20 @@ const Home = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.5 }}
-                className="flex flex-col sm:flex-row items-center justify-center gap-6"
+                className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6"
               >
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
                   <Link
                     to={`/event-registration/${upcomingEvent.id}`}
-                    className="px-14 py-5 bg-primary-600 hover:bg-primary-500 text-white font-black text-sm uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-primary-600/40 flex items-center gap-3"
+                    className="w-full sm:w-auto justify-center px-8 sm:px-14 py-3.5 sm:py-5 bg-primary-600 hover:bg-primary-500 text-white font-black text-xs sm:text-sm uppercase tracking-[0.2em] rounded-2xl transition-all shadow-2xl shadow-primary-600/40 flex items-center gap-3"
                   >
                     {t.registerNow} <motion.div animate={{ x: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 1.5 }}><ArrowRight size={20} /></motion.div>
                   </Link>
                 </motion.div>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full sm:w-auto">
                   <Link
                     to="/events"
-                    className="px-14 py-5 bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md font-black text-sm uppercase tracking-[0.2em] rounded-2xl transition-all"
+                    className="w-full sm:w-auto block text-center px-8 sm:px-14 py-3.5 sm:py-5 bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-md font-black text-xs sm:text-sm uppercase tracking-[0.2em] rounded-2xl transition-all"
                   >
                     {t.learnMore}
                   </Link>

@@ -1,7 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { db, storage } from '../services/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '../services/supabase';
 import {
    User, Mail, Phone, MapPin, Briefcase, FileText,
    ChevronRight, CheckCircle2, ShieldCheck, Loader2, Upload
@@ -9,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import usePreventBack from '../hooks/usePreventBack';
 import { LanguageContext } from '../context/LanguageContext';
 
 // Translations for Register Page
@@ -181,6 +180,7 @@ const translations = {
 
 const Register = () => {
    const { currentUser, userData } = useAuth();
+   usePreventBack(Boolean(currentUser));
    const { language } = useContext(LanguageContext);
    const t = translations[language];
    const location = useLocation();
@@ -231,92 +231,86 @@ const Register = () => {
       setFiles({ ...files, [e.target.name]: e.target.files[0] });
    };
 
+   const uploadFile = async (folder, file) => {
+      if (!file) return '';
+      const safeName = (file.name || 'file').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filePath = `${folder}/${Date.now()}_${safeName}`;
+      const { error } = await supabase.storage.from('uploads').upload(filePath, file);
+      if (error) throw error;
+      const { data } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      return data.publicUrl;
+   };
+
    const handleSubmit = async (e) => {
       e.preventDefault();
       setSubmitting(true);
 
       try {
-         // 1. Upload Files
-         let profileUrl = '';
-         let degreeUrl = '';
-         let aadharUrl = '';
-         let panUrl = '';
-         let registrationUrl = '';
-         let bioWasteUrl = '';
-         let awardUrl = '';
-         let shopActUrl = '';
-         let visitingCardUrl = '';
+         // 1. Upload Files to Supabase Storage
+         const [
+            profileUrl,
+            degreeUrl,
+            aadharUrl,
+            panUrl,
+            registrationUrl,
+            bioWasteUrl,
+            awardUrl,
+            shopActUrl,
+            visitingCardUrl
+         ] = await Promise.all([
+            uploadFile('profiles', files.profilePhoto),
+            uploadFile('certificates', files.degreeCertificate),
+            uploadFile('aadhar', files.aadharCard),
+            uploadFile('pan', files.panCard),
+            uploadFile('registration', files.registrationCertificate),
+            uploadFile('biowaste', files.bioWasteCertificate),
+            uploadFile('awards', files.awardCertificate),
+            uploadFile('shopact', files.shopActDocument),
+            uploadFile('visitingcard', files.visitingCard),
+         ]);
 
-         if (files.profilePhoto) {
-            const photoRef = ref(storage, `profiles/${Date.now()}_${files.profilePhoto.name}`);
-            const snap = await uploadBytes(photoRef, files.profilePhoto);
-            profileUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.degreeCertificate) {
-            const degreeRef = ref(storage, `certificates/${Date.now()}_${files.degreeCertificate.name}`);
-            const snap = await uploadBytes(degreeRef, files.degreeCertificate);
-            degreeUrl = await getDownloadURL(snap.ref);
-         }
-         if (files.aadharCard) {
-            const aadharRef = ref(storage, `aadhar/${Date.now()}_${files.aadharCard.name}`);
-            const snap = await uploadBytes(aadharRef, files.aadharCard);
-            aadharUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.panCard) {
-            const panRef = ref(storage, `pan/${Date.now()}_${files.panCard.name}`);
-            const snap = await uploadBytes(panRef, files.panCard);
-            panUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.registrationCertificate) {
-            const fileRef = ref(storage, `registration/${Date.now()}_${files.registrationCertificate.name}`);
-            const snap = await uploadBytes(fileRef, files.registrationCertificate);
-            registrationUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.bioWasteCertificate) {
-            const fileRef = ref(storage, `biowaste/${Date.now()}_${files.bioWasteCertificate.name}`);
-            const snap = await uploadBytes(fileRef, files.bioWasteCertificate);
-            bioWasteUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.awardCertificate) {
-            const fileRef = ref(storage, `awards/${Date.now()}_${files.awardCertificate.name}`);
-            const snap = await uploadBytes(fileRef, files.awardCertificate);
-            awardUrl = await getDownloadURL(snap.ref);
-         }
-
-         if (files.shopActDocument) {
-            const fileRef = ref(storage, `shopact/${Date.now()}_${files.shopActDocument.name}`);
-            const snap = await uploadBytes(fileRef, files.shopActDocument);
-            shopActUrl = await getDownloadURL(snap.ref);
-         }
-         if (files.visitingCard) {
-            const fileRef = ref(storage, `visitingcard/${Date.now()}_${files.visitingCard.name}`);
-            const snap = await uploadBytes(fileRef, files.visitingCard);
-            visitingCardUrl = await getDownloadURL(snap.ref);
-         }
-
-         // 2. Save Data to Firestore
+         // 2. Save Data to Supabase
          const fullName = `${formData.firstName} ${formData.fatherName} ${formData.surname}`.trim();
+         const rawUid = currentUser?.id || currentUser?.uid;
+         const isUuid =
+            typeof rawUid === 'string' &&
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUid);
 
-         await addDoc(collection(db, 'registrations'), {
-            ...formData,
-            uid: currentUser.uid,
-            profilePhoto: profileUrl,
-            degreeCertificate: degreeUrl,
-            aadharCard: aadharUrl,
-            panCard: panUrl,
+         const { error: insertError } = await supabase.from('registrations').insert([{
+            uid: isUuid ? rawUid : null,
+            full_name: fullName,
+            first_name: formData.firstName,
+            father_name: formData.fatherName,
+            mother_name: formData.motherName,
+            surname: formData.surname,
+            email: formData.email,
+            phone: formData.phone,
+            office_phone: formData.officePhone,
+            dob: formData.dob,
+            experience: formData.experience,
+            registration_no: formData.registrationNo,
+            qualification: formData.qualification,
+            organization: formData.organization,
+            address: formData.address,
+            district: formData.district,
+            taluka: formData.taluka,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+            profile_photo: profileUrl,
+            degree_certificate: degreeUrl,
+            aadhar_card: aadharUrl,
+            pan_card: panUrl,
+            registration_certificate: registrationUrl,
+            bio_waste_certificate: bioWasteUrl,
+            award_certificate: awardUrl,
+            shop_act_document: shopActUrl,
+            visiting_card: visitingCardUrl,
             status: 'pending',
-            createdAt: serverTimestamp(),
-            registrationCertificate: registrationUrl,
-            bioWasteCertificate: bioWasteUrl,
-            awardCertificate: awardUrl,
-            shopActDocument: shopActUrl,
-            visitingCard: visitingCardUrl,
-         });
+            created_at: new Date().toISOString(),
+         }]);
+
+         if (insertError) throw insertError;
 
          setSubmitted(true);
       } catch (error) {
@@ -364,7 +358,7 @@ const Register = () => {
             <div className="lg:col-span-5">
                <div className="sticky top-40">
                   <span className="text-[11px] font-black text-primary-600 uppercase tracking-[0.3em] mb-4 inline-block">{t.professionalRegistry}</span>
-                  <h1 className="text-5xl lg:text-6xl font-black text-slate-900 leading-[1.1] mb-8 tracking-tighter">
+                  <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 leading-[1.1] mb-6 sm:mb-8 tracking-tight">
                      {t.eliteCircle} <span className="text-primary-600">{t.eliteHighlight}</span> {t.eliteEnd}
                   </h1>
                   <p className="text-slate-500 text-lg font-medium mb-12 leading-relaxed">

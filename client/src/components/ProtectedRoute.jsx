@@ -11,16 +11,16 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
   if (!currentUser) {
     if (location.pathname.startsWith('/super-admin')) {
-      return <Navigate to="/super-admin-login" />;
+      return <Navigate to="/super-admin-login" replace />;
     }
     if (location.pathname.startsWith('/admin')) {
-      return <Navigate to="/admin-login" />;
+      return <Navigate to="/admin-login" replace />;
     }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(userData?.role)) {
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
   return children;

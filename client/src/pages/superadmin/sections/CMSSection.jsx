@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../../services/firebase';
-import { collection, doc, updateDoc, addDoc, getDoc, getDocs, deleteDoc, serverTimestamp, query, orderBy } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import {
   Home as HomeIcon, Info, Newspaper, Bell, Users, Layout,
   Plus, Trash2, Save, Loader2, RefreshCw, Sparkles
@@ -38,14 +37,35 @@ const CMSSection = () => {
   const fetchCMSData = async () => {
     setLoading(true);
     try {
-      const mainSnap = await getDoc(doc(db, 'content', 'main'));
-      if (mainSnap.exists()) setMainContent(mainSnap.data());
+      const [
+        { data: mainSnap },
+        { data: newsSnap },
+        { data: noticesSnap }
+      ] = await Promise.all([
+        supabase.from('content').select('*').eq('id', 'main').single(),
+        supabase.from('news').select('*').order('created_at', { ascending: false }),
+        supabase.from('notices').select('*').order('created_at', { ascending: false })
+      ]);
 
-      const newsSnap = await getDocs(query(collection(db, 'news'), orderBy('createdAt', 'desc')));
-      setNews(newsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      if (mainSnap) {
+        setMainContent(prev => ({
+          ...prev,
+          heroTitle: mainSnap.hero_title ?? prev.heroTitle,
+          heroSubtext: mainSnap.hero_subtext ?? prev.heroSubtext,
+          aboutText: mainSnap.about_text ?? prev.aboutText,
+          memberCountOffset: mainSnap.member_count_offset ?? prev.memberCountOffset,
+          email: mainSnap.email ?? prev.email,
+          phone: mainSnap.phone ?? prev.phone,
+          address: mainSnap.address ?? prev.address,
+          facebook: mainSnap.facebook ?? prev.facebook,
+          twitter: mainSnap.twitter ?? prev.twitter,
+          instagram: mainSnap.instagram ?? prev.instagram,
+          bannerUrl: mainSnap.banner_url ?? prev.bannerUrl,
+        }));
+      }
 
-      const noticesSnap = await getDocs(query(collection(db, 'notices'), orderBy('createdAt', 'desc')));
-      setNotices(noticesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setNews(newsSnap || []);
+      setNotices(noticesSnap || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -56,30 +76,73 @@ const CMSSection = () => {
   const handleSaveMain = async () => {
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'content', 'main'), mainContent);
+      const { error } = await supabase.from('content').upsert({
+        id: 'main',
+        hero_title: mainContent.heroTitle,
+        hero_subtext: mainContent.heroSubtext,
+        about_text: mainContent.aboutText,
+        member_count_offset: Number(mainContent.memberCountOffset) || 0,
+        email: mainContent.email,
+        phone: mainContent.phone,
+        address: mainContent.address,
+        facebook: mainContent.facebook,
+        twitter: mainContent.twitter,
+        instagram: mainContent.instagram,
+        banner_url: mainContent.bannerUrl,
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) throw error;
       alert('Main content updated!');
     } catch (e) {
-      await addDoc(collection(db, 'content'), { ...mainContent, id: 'main' });
-    } finally { setSaving(false); }
+      console.error(e);
+      alert('Failed to update main content.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addNews = async () => {
     if (!newNews.title) return;
-    await addDoc(collection(db, 'news'), { ...newNews, createdAt: serverTimestamp() });
+    const { error } = await supabase.from('news').insert([{
+      title: newNews.title,
+      content: newNews.content,
+      created_at: new Date().toISOString()
+    }]);
+    if (error) {
+      console.error(error);
+      alert('Failed to add story.');
+      return;
+    }
     setNewNews({ title: '', content: '' });
     fetchCMSData();
   };
 
   const addNotice = async () => {
     if (!newNotice.title) return;
-    await addDoc(collection(db, 'notices'), { ...newNotice, createdAt: serverTimestamp() });
+    const { error } = await supabase.from('notices').insert([{
+      title: newNotice.title,
+      content: newNotice.content,
+      priority: newNotice.priority,
+      created_at: new Date().toISOString()
+    }]);
+    if (error) {
+      console.error(error);
+      alert('Failed to broadcast notice.');
+      return;
+    }
     setNewNotice({ title: '', content: '', priority: 'Normal' });
     fetchCMSData();
   };
 
   const deleteItem = async (col, id) => {
     if (confirm('Delete this item?')) {
-      await deleteDoc(doc(db, col, id));
+      const { error } = await supabase.from(col).delete().eq('id', id);
+      if (error) {
+        console.error(error);
+        alert('Failed to delete item.');
+        return;
+      }
       fetchCMSData();
     }
   };

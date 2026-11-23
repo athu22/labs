@@ -1,31 +1,40 @@
 import React from 'react';
-import { db } from '../../../services/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '../../../services/supabase';
 import { Check, X, User, Briefcase, Mail, Phone, ShieldCheck, MapPin, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const PendingRegistrations = ({ registrations, refresh }) => {
   const handleVerify = async (id) => {
     try {
-      await updateDoc(doc(db, 'registrations', id), {
-        status: 'verified', // Admin verifies, moves to Super Admin
-        verifiedByAdminAt: new Date()
-      });
+      const { error } = await supabase
+        .from('registrations')
+        .update({
+          status: 'verified', // Admin verifies, moves to Super Admin
+          verified_by_admin_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (error) throw error;
       refresh();
     } catch (error) {
       console.error("Error verifying:", error);
+      alert("Failed to verify registration.");
     }
   };
 
   const handleReject = async (id) => {
     if (confirm('Are you sure you want to reject this application?')) {
       try {
-        await updateDoc(doc(db, 'registrations', id), {
-          status: 'rejected'
-        });
+        const { error } = await supabase
+          .from('registrations')
+          .update({ status: 'rejected' })
+          .eq('id', id);
+
+        if (error) throw error;
         refresh();
       } catch (error) {
         console.error("Error rejecting:", error);
+        alert("Failed to reject registration.");
       }
     }
   };

@@ -41,6 +41,25 @@ import fMember17 from '../assets/committee/member_17.jpeg';
 import fMember18 from '../assets/committee/member_18.jpeg';
 import fMember19 from '../assets/committee/member_19.jpeg';
 
+// Zonal & District Reps images
+import tMember1 from '../assets/new_team/team_1.jpeg';
+import tMember2 from '../assets/new_team/team_2.jpeg';
+import tMember3 from '../assets/new_team/team_4.jpeg';
+import tMember4 from '../assets/new_team/team_5.jpeg';
+import tMember5 from '../assets/new_team/team_7.jpeg';
+import tMember6 from '../assets/new_team/team_9.jpeg';
+import tMember7 from '../assets/new_team/team_10.jpeg';
+import tMember8 from '../assets/new_team/team_11.jpeg';
+import tMember9 from '../assets/new_team/team_12.jpeg';
+import tMember10 from '../assets/new_team/team_13.jpeg';
+import tMember11 from '../assets/new_team/team_15.jpeg';
+import tMember12 from '../assets/new_team/team_16.jpeg';
+import tMember13 from '../assets/new_team/team_17.jpeg';
+import tMember14 from '../assets/new_team/team_18.jpeg';
+import tMember15 from '../assets/new_team/team_20.jpeg';
+import tMember16 from '../assets/new_team/team_21.jpeg';
+import tMember17 from '../assets/new_team/team_23.jpeg';
+
 // Second Executive Committee images
 import sMember1 from '../assets/second_committee/face_1.jpeg';
 import sMember2 from '../assets/second_committee/face_2.jpeg';
@@ -131,6 +150,9 @@ const translations = {
     secondExecutiveBoard: 'Second',
     secondExecutiveBoardEnd: 'Executive Committee',
     secondExecutiveBoardDesc: 'The visionary leaders who expanded the reach of ACLAP',
+    zonalDistrictReps: 'Zonal & District',
+    zonalDistrictRepsEnd: 'Representatives',
+    zonalDistrictRepsDesc: 'Dedicated leaders managing operations across various zones and districts',
     viewCommittee: 'View Committee',
     hideCommittee: 'Hide Committee',
 
@@ -240,6 +262,9 @@ const translations = {
     secondExecutiveBoard: 'दुसरी',
     secondExecutiveBoardEnd: 'कार्यकारिणी समिती',
     secondExecutiveBoardDesc: 'ACLAP ची व्याप्ती वाढवणारे दूरदर्शी नेते',
+    zonalDistrictReps: 'झोनल आणि जिल्हा',
+    zonalDistrictRepsEnd: 'प्रतिनिधी',
+    zonalDistrictRepsDesc: 'विविध झोन आणि जिल्ह्यांमध्ये ऑपरेशन्स व्यवस्थापित करणारे समर्पित नेते',
     viewCommittee: 'समिती पहा',
     hideCommittee: 'समिती लपवा',
 
@@ -294,6 +319,7 @@ const About = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFirstCommitteeVisible, setIsFirstCommitteeVisible] = useState(false);
   const [isSecondCommitteeVisible, setIsSecondCommitteeVisible] = useState(false);
+  const [isThirdCommitteeVisible, setIsThirdCommitteeVisible] = useState(false);
 
   // Empty testimonials array
   const testimonials = [];
@@ -399,6 +425,11 @@ const About = () => {
     { name: 'Udaykumar Khairnar', position: 'Vice President', image: fMember3 },
     { name: 'Raghunath Bhongale', position: 'Joint Secretary', image: fMember4 },
     { name: 'Shivaji Kadam', position: 'Treasurer', image: fMember5 },
+    { name: 'Anil Gite', position: 'Zonal Secretary', image: fMember15 },
+    { name: 'Vilas Rasal', position: 'Zonal Secretary', image: fMember16 },
+    { name: 'Dhanjay Kulkarni', position: 'Zonal Secretary', image: fMember17 },
+    { name: 'Kumar Patil', position: 'Zonal Secretary', image: fMember18 },
+    { name: 'Janardhan Chopade', position: 'Zonal Secretary', image: fMember19 },
     { name: 'Anil Rathi', position: 'Director', image: fMember6 },
     { name: 'Shripad Karandikar', position: 'Director', image: fMember7 },
     { name: 'Gautam Desai', position: 'Director', image: fMember8 },
@@ -407,12 +438,7 @@ const About = () => {
     { name: 'Shakil Attar', position: 'Director', image: fMember11 },
     { name: 'Varsha Zavar', position: 'Director', image: fMember12 },
     { name: 'Nitin Salunkhe', position: 'Director', image: fMember13 },
-    { name: 'Girish Sharanathe', position: 'Director', image: fMember14 },
-    { name: 'Anil Gite', position: 'Zonal Secretary', image: fMember15 },
-    { name: 'Vilas Rasal', position: 'Zonal Secretary', image: fMember16 },
-    { name: 'Dhanjay Kulkarni', position: 'Zonal Secretary', image: fMember17 },
-    { name: 'Kumar Patil', position: 'Zonal Secretary', image: fMember18 },
-    { name: 'Janardhan Chopade', position: 'Zonal Secretary', image: fMember19 }
+    { name: 'Girish Sharanathe', position: 'Director', image: fMember14 }
   ];
 
   const secondExecutiveCommittee = [
@@ -436,6 +462,26 @@ const About = () => {
     { name: 'Nikhil Late', position: 'Director', image: sMember18 },
     { name: 'Rajesh Garud', position: 'Director', image: sMember19 },
     { name: 'Varsha Zanvar', position: 'Director', image: sMember20 }
+  ];
+
+  const thirdExecutiveCommittee = [
+    { name: 'Chandrakant Kothavade', position: 'Zonal Secretary (Kokan Zone)', image: tMember1 },
+    { name: 'Ramakrishna Borase', position: 'Zonal Secretary (North Maharashtra Zone)', image: tMember2 },
+    { name: 'Sanjay Jadhav', position: 'Zonal Secretary (West Maharashtra Zone)', image: tMember3 },
+    { name: 'Shankar Kale', position: 'Zonal Secretary (Marathwada Zone)', image: tMember4 },
+    { name: 'Kumar Patil', position: 'Ahilyanagar Dist.', image: tMember5 },
+    { name: 'Udaykumar Khairnar', position: 'Jalgaon Dist.', image: tMember6 },
+    { name: 'Hemant Kumbhar', position: 'Raigad Dist.', image: tMember7 },
+    { name: 'Damodar Sanadikar', position: 'Beed Dist.', image: tMember8 },
+    { name: 'Daniel Ingale', position: 'Chh. Sambhajinagar Dist.', image: tMember9 },
+    { name: 'Mahiboob Sanadi', position: 'Sangli Dist.', image: tMember10 },
+    { name: 'Sateshkumar Saste', position: 'Dharashiv Dist.', image: tMember11 },
+    { name: 'Bapuji Dhomase', position: 'Nashik Dist.', image: tMember12 },
+    { name: 'Mohan Metkari', position: 'Pune Dist.', image: tMember13 },
+    { name: 'Dilip Pokale', position: 'Pune Dist.', image: tMember14 },
+    { name: 'Suhas Narkar', position: 'Ratnagiri Dist.', image: tMember15 },
+    { name: 'Sharangouda Biradar', position: 'Solapur Dist.', image: tMember17 },
+    { name: 'Dipak Thakare', position: 'Yavatmal Dist.', image: tMember16 }
   ];
 
   useEffect(() => {
@@ -518,7 +564,7 @@ const About = () => {
 
               <motion.h1
                 variants={controls.fadeInUp}
-                className="text-5xl md:text-7xl lg:text-8xl font-black text-slate-900 leading-[1.1] tracking-tighter mb-6"
+                className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-black text-slate-900 leading-[1.1] tracking-tight mb-6"
               >
                 {t.heroTitle}{' '}
                 <span className="relative inline-block">
@@ -1074,7 +1120,7 @@ const About = () => {
                       <img
                         src={leader.image}
                         alt={leader.name}
-                        className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-xl z-10"
+                        className="w-32 h-32 rounded-full object-contain bg-white border-4 border-white shadow-xl z-10"
                       />
                     </motion.div>
                     <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white to-transparent" />
@@ -1093,6 +1139,63 @@ const About = () => {
                 </div>
               </motion.div>
             ))}
+          </div>
+
+          {/* Zonal & District Representatives (Rendered as part of main team) */}
+          <AnimatePresence>
+            {isThirdCommitteeVisible && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.5, ease: "easeInOut" }}
+                className="overflow-hidden mt-12"
+              >
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 pb-8">
+                  {thirdExecutiveCommittee.map((leader, i) => (
+                    <motion.div
+                      key={`t-${i}`}
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      whileHover={{ y: -5 }}
+                      className="group cursor-pointer h-full"
+                    >
+                      <div className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 hover:shadow-2xl transition-all relative h-full flex flex-col p-6 text-center">
+                        {leader.image ? (
+                          <img src={leader.image} alt={leader.name} className="w-24 h-24 rounded-full object-contain bg-white border-4 border-primary-50 shadow-md mx-auto mb-4 shrink-0" />
+                        ) : (
+                          <div className="w-24 h-24 bg-gradient-to-br from-primary-50 to-primary-100 rounded-full flex items-center justify-center mx-auto mb-4 text-primary-500 shrink-0">
+                            <UserCheck size={36} />
+                          </div>
+                        )}
+                        <div className="flex-grow flex flex-col justify-center">
+                          <h3 className="text-sm md:text-lg font-black text-slate-900 mb-1 leading-tight">{leader.name}</h3>
+                          <p className="text-primary-600 text-[10px] md:text-xs font-bold uppercase tracking-wider">{leader.position}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="text-center mt-4">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setIsThirdCommitteeVisible(!isThirdCommitteeVisible)}
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-primary-700 border-2 border-primary-200 font-black text-sm uppercase tracking-wider rounded-full shadow-lg hover:shadow-xl hover:bg-primary-50 transition-all"
+            >
+              {isThirdCommitteeVisible ? t.hideCommittee : t.viewCommittee}
+              <motion.div
+                animate={{ rotate: isThirdCommitteeVisible ? -90 : 90 }}
+                transition={{ duration: 0.3 }}
+              >
+                <ChevronRight size={18} />
+              </motion.div>
+            </motion.button>
           </div>
         </div>
       </section>
@@ -1146,7 +1249,7 @@ const About = () => {
                   <img
                     src={leader.image}
                     alt={leader.name}
-                    className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
+                    className="w-20 h-20 rounded-full object-contain bg-white border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
                   />
                   <div className="flex-grow flex flex-col justify-center">
                     <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
@@ -1180,7 +1283,7 @@ const About = () => {
                         <img
                           src={leader.image}
                           alt={leader.name}
-                          className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
+                          className="w-20 h-20 rounded-full object-contain bg-white border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0"
                         />
                         <div className="flex-grow flex flex-col justify-center">
                           <h3 className="text-sm md:text-base font-black text-slate-800 mb-1 leading-tight">{leader.name}</h3>
@@ -1260,7 +1363,7 @@ const About = () => {
               >
                 <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
                   {leader.image ? (
-                    <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
+                    <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-contain bg-white border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
                   ) : (
                     <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-4 text-primary-600 shadow-inner shrink-0">
                       <UserCheck size={32} />
@@ -1296,7 +1399,7 @@ const About = () => {
                     >
                       <div className="bg-white rounded-xl overflow-hidden shadow-md border border-slate-100 hover:shadow-xl transition-all relative h-full flex flex-col p-6 text-center">
                         {leader.image ? (
-                          <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-cover border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
+                          <img src={leader.image} alt={leader.name} className="w-20 h-20 rounded-full object-contain bg-white border-2 border-primary-100 shadow-md mx-auto mb-4 shrink-0" />
                         ) : (
                           <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-4 text-primary-600 shadow-inner shrink-0">
                             <UserCheck size={32} />

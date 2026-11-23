@@ -7,6 +7,7 @@ import {
   Share2, Download, Heart, Eye, ArrowRight
 } from 'lucide-react';
 import { LanguageContext } from '../context/LanguageContext';
+import { supabase } from '../services/supabase';
 
 // Import images from assets
 import event1 from '../assets/event1.jpeg';
@@ -106,31 +107,139 @@ const EVENT_IMAGES = [
   event6, event7, event8, event9, event10
 ];
 
+// High-performance, self-contained Gallery Card
+const GalleryCard = React.memo(({
+  url,
+  index,
+  viewMode,
+  isLiked,
+  onSelect,
+  onLike,
+  onShare,
+  onDownload,
+  onHover,
+  t,
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true, margin: "100px" }}
+      transition={{ delay: (index % 5) * 0.04, duration: 0.35, ease: "easeOut" }}
+      whileHover={{ y: -8, scale: 1.02 }}
+      className={`group/item relative ${
+        viewMode === 'grid' ? 'aspect-[4/5]' : 'aspect-[16/9]'
+      } rounded-[2rem] overflow-hidden bg-slate-100 shadow-xl shadow-slate-200/50 cursor-pointer transition-all duration-300`}
+      onClick={() => onSelect(url)}
+      onMouseEnter={() => onHover(index)}
+      onMouseLeave={() => onHover(null)}
+    >
+      {/* Background Pulse Shimmer until image is ready */}
+      {!isLoaded && (
+        <div className="absolute inset-0 bg-slate-200/70 animate-pulse flex items-center justify-center">
+          <ImageIcon className="text-slate-300 w-8 h-8 opacity-50" />
+        </div>
+      )}
+
+      <img
+        ref={(el) => {
+          if (el && el.complete && !isLoaded) {
+            setIsLoaded(true);
+          }
+        }}
+        src={url}
+        alt={`Gallery Moment ${index + 1}`}
+        loading={index < 5 ? "eager" : "lazy"}
+        fetchPriority={index < 5 ? "high" : "auto"}
+        decoding="async"
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setIsLoaded(true)}
+        className={`w-full h-full object-cover transition-opacity duration-300 group-hover/item:scale-110 ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+
+      {/* Enhanced Glassmorphic Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent opacity-0 group-hover/item:opacity-100 transition-opacity duration-300 flex flex-col justify-between p-6 pointer-events-none group-hover/item:pointer-events-auto">
+        <div className="flex justify-end gap-2">
+          <button
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-all hover:scale-110 active:scale-95"
+            onClick={(e) => onLike(e, index)}
+          >
+            <Heart size={18} className={isLiked ? 'fill-red-500 text-red-500' : ''} />
+          </button>
+          <button
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-all hover:scale-110 active:scale-95"
+            onClick={(e) => onShare(e, url)}
+          >
+            <Share2 size={18} />
+          </button>
+          <button
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-all hover:scale-110 active:scale-95"
+            onClick={(e) => onDownload(e, url)}
+          >
+            <Download size={18} />
+          </button>
+        </div>
+
+        <div className="translate-y-4 group-hover/item:translate-y-0 transition-transform duration-300 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white/90 text-xs font-bold">
+            <Eye size={14} />
+            <span>{t.viewDetails}</span>
+          </div>
+          <div className="w-11 h-11 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl flex items-center justify-center text-white shadow-lg">
+            <ZoomIn size={18} />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+});
+GalleryCard.displayName = 'GalleryCard';
+
 const Gallery = () => {
   const { language } = useContext(LanguageContext);
   const t = translations[language];
 
+  const [images, setImages] = useState(EVENT_IMAGES);
   const [loading, setLoading] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [hoveredImage, setHoveredImage] = useState(null);
   const [likedImages, setLikedImages] = useState({});
-  const [imageLoadStates, setImageLoadStates] = useState({});
   const heroRef = useRef(null);
 
-  // Initialize image load states
+  // Fetch dynamic gallery items from Supabase & combine with default assets
   useEffect(() => {
-    EVENT_IMAGES.forEach((_, idx) => {
-      setImageLoadStates(prev => ({ ...prev, [idx]: false }));
-    });
-    // Set loading to false after a short delay to simulate loading
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
+    let isMounted = true;
+    const fetchDynamicGallery = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('gallery')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-  const handleImageLoad = (idx) => {
-    setImageLoadStates(prev => ({ ...prev, [idx]: true }));
-  };
+        if (!error && data && data.length > 0 && isMounted) {
+          const dynamicUrls = [];
+          data.forEach(item => {
+            const urls = item.image_urls || item.imageUrls || [];
+            if (Array.isArray(urls)) {
+              dynamicUrls.push(...urls);
+            }
+          });
+          if (dynamicUrls.length > 0) {
+            setImages([...dynamicUrls, ...EVENT_IMAGES]);
+          }
+        }
+      } catch (err) {
+        console.warn('[Gallery] Supabase fetch error:', err);
+      }
+    };
+    fetchDynamicGallery();
+    return () => { isMounted = false; };
+  }, []);
 
   const handleLike = (e, imageIdx) => {
     e.stopPropagation();
@@ -259,7 +368,7 @@ const Gallery = () => {
       />
 
       {/* Immersive Hero Section with Parallax */}
-      <div className="relative pt-48 pb-32 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="relative pt-28 pb-10 sm:pt-32 sm:pb-12 md:pt-36 md:pb-12 overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         <Particles />
 
         <div className="absolute inset-0">
@@ -297,21 +406,20 @@ const Gallery = () => {
             <motion.div
               custom={0}
               variants={staggerText}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white/5 backdrop-blur-md border border-white/10 text-primary-400 text-[10px] font-black uppercase tracking-[0.3em] mb-8 group cursor-pointer hover:bg-white/10 transition-all"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-primary-400 text-xs font-semibold uppercase tracking-wider mb-4 group cursor-pointer hover:bg-white/15 transition-all"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Sparkles size={12} className="animate-pulse group-hover:rotate-12 transition-transform" />
+              <Sparkles size={13} className="animate-pulse group-hover:rotate-12 transition-transform" />
               {t.associationVisualArchive}
             </motion.div>
 
             <motion.h1
               custom={1}
               variants={staggerText}
-              className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-[0.9] mb-8"
+              className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight mb-3"
             >
-              Moments <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 via-blue-500 to-primary-600 animate-gradient-x">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 via-blue-400 to-indigo-400">
                 {t.momentsDefined}
               </span>
             </motion.h1>
@@ -319,7 +427,7 @@ const Gallery = () => {
             <motion.p
               custom={2}
               variants={staggerText}
-              className="text-slate-400 text-xl font-medium leading-relaxed max-w-xl"
+              className="text-slate-300 text-sm sm:text-base font-normal leading-relaxed max-w-2xl mb-6"
             >
               {t.gallerySubtitle}
             </motion.p>
@@ -328,50 +436,39 @@ const Gallery = () => {
             <motion.div
               custom={3}
               variants={staggerText}
-              className="flex flex-wrap gap-8 mt-12 pt-8 border-t border-white/10"
+              className="flex flex-wrap items-center gap-5 sm:gap-8 pt-5 border-t border-white/10"
             >
               {[
-                { icon: Camera, label: t.momentsCaptured, value: EVENT_IMAGES.length },
+                { icon: Camera, label: t.momentsCaptured, value: images.length },
                 { icon: Award, label: t.eventsCovered, value: "10+" },
                 { icon: Users, label: t.communityMembers, value: "5K+" },
                 { icon: Clock, label: t.yearsOfExcellence, value: "8+" },
               ].map((stat, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="p-2 bg-white/5 rounded-xl">
-                    <stat.icon size={20} className="text-primary-400" />
+                <div key={idx} className="flex items-center gap-2.5">
+                  <div className="p-2 bg-white/10 rounded-lg">
+                    <stat.icon size={16} className="text-primary-400" />
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-white">
+                    <div className="text-lg sm:text-xl font-bold text-white leading-tight">
                       {typeof stat.value === 'number' ? <StatsCounter end={stat.value} /> : stat.value}
                     </div>
-                    <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{stat.label}</div>
+                    <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{stat.label}</div>
                   </div>
                 </div>
               ))}
             </motion.div>
           </motion.div>
         </div>
-
-        {/* Scroll Indicator */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2"
-          animate={{ y: [0, 10, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-        >
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
-            <div className="w-1 h-2 bg-white/50 rounded-full mt-2 animate-scroll" />
-          </div>
-        </motion.div>
       </div>
 
       {/* Gallery Content */}
-      <div className="max-w-7xl mx-auto px-4 py-24 relative -mt-16 z-20">
+      <div className="max-w-7xl mx-auto px-4 py-8 sm:py-10 relative z-20">
         {/* Filter & View Controls */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
-          className="flex flex-wrap items-center justify-between gap-6 mb-12"
+          transition={{ delay: 0.2, duration: 0.5 }}
+          className="flex flex-wrap items-center justify-between gap-4 mb-6 sm:mb-8"
         >
           <div className="flex flex-wrap gap-3">
             <motion.button
@@ -420,88 +517,29 @@ const Gallery = () => {
           </div>
         ) : (
           <div className={`${viewMode === 'grid'
-            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6'
+            ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-6'
             : 'space-y-4 max-w-4xl mx-auto'
             }`}
           >
-            {EVENT_IMAGES.map((url, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, scale: 0.9 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.03, duration: 0.5, type: "spring", stiffness: 300 }}
-                whileHover={{ y: -12, scale: 1.02 }}
-                className={`group/item relative ${viewMode === 'grid' ? 'aspect-[4/5]' : 'aspect-[16/9]'
-                  } rounded-[2rem] overflow-hidden bg-white shadow-xl shadow-slate-200/50 cursor-pointer transition-all duration-500`}
-                onClick={() => setSelectedImage(url)}
-                onMouseEnter={() => setHoveredImage(i)}
-                onMouseLeave={() => setHoveredImage(null)}
-              >
-                {/* Skeleton Loader */}
-                {!imageLoadStates[i] && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 animate-shimmer" />
-                )}
-
-                <img
-                  src={url}
-                  alt={`Gallery Asset ${i + 1}`}
-                  loading="lazy"
-                  className={`w-full h-full object-cover grayscale-[0.2] group-hover/item:grayscale-0 transition-all duration-700 group-hover/item:scale-110 ${imageLoadStates[i] ? 'opacity-100' : 'opacity-0'
-                    }`}
-                  onLoad={() => handleImageLoad(i)}
-                />
-
-                {/* Enhanced Glassmorphic Overlay */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/30 to-transparent opacity-0 group-hover/item:opacity-100 transition-all duration-500 flex flex-col justify-between p-6"
-                  initial={false}
-                  animate={{ opacity: 0 }}
-                  whileHover={{ opacity: 1 }}
-                >
-                  <div className="flex justify-end gap-2">
-                    <motion.button
-                      className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-colors"
-                      whileHover={{ scale: 1.1, rotate: 360 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleLike(e, i)}
-                    >
-                      <Heart size={18} className={likedImages[`img-${i}`] ? 'fill-red-500 text-red-500' : ''} />
-                    </motion.button>
-                    <motion.button
-                      className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleShare(e, url)}
-                    >
-                      <Share2 size={18} />
-                    </motion.button>
-                    <motion.button
-                      className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-xl flex items-center justify-center text-white hover:bg-primary-500 transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={(e) => handleDownload(e, url)}
-                    >
-                      <Download size={18} />
-                    </motion.button>
-                  </div>
-
-                  <div className="translate-y-8 group-hover/item:translate-y-0 transition-transform duration-500 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-white/80 text-xs">
-                      <Eye size={14} />
-                      <span>{t.viewDetails}</span>
-                    </div>
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-xl border border-white/30 rounded-2xl flex items-center justify-center text-white">
-                      <ZoomIn size={20} />
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
+            {images.map((url, i) => (
+              <GalleryCard
+                key={`${url}-${i}`}
+                url={url}
+                index={i}
+                viewMode={viewMode}
+                isLiked={Boolean(likedImages[`img-${i}`])}
+                onSelect={(selectedUrl) => setSelectedImage(selectedUrl)}
+                onLike={handleLike}
+                onShare={handleShare}
+                onDownload={handleDownload}
+                onHover={(idx) => setHoveredImage(idx)}
+                t={t}
+              />
             ))}
           </div>
         )}
 
-        {!loading && EVENT_IMAGES.length === 0 && (
+        {!loading && images.length === 0 && (
           <motion.div
             className="text-center py-40 bg-white rounded-[4rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden relative"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -575,7 +613,7 @@ const Gallery = () => {
 
       {/* Premium CTA Section with 3D tilt effect */}
       <motion.section
-        className="bg-white py-40 px-4 relative overflow-hidden"
+        className="bg-white py-16 sm:py-24 md:py-32 px-4 relative overflow-hidden"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
@@ -585,9 +623,9 @@ const Gallery = () => {
         {/* Animated background pattern */}
         <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:20px_20px] opacity-20" />
 
-        <div className="max-w-4xl mx-auto text-center space-y-12 relative z-10">
+        <div className="max-w-4xl mx-auto text-center space-y-8 sm:space-y-12 relative z-10">
           <motion.h2
-            className="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter leading-[0.9]"
+            className="text-3xl sm:text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-tight"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
@@ -604,7 +642,7 @@ const Gallery = () => {
           </motion.h2>
 
           <motion.p
-            className="text-slate-500 font-medium text-xl leading-relaxed max-w-2xl mx-auto"
+            className="text-slate-500 font-medium text-sm sm:text-base md:text-xl leading-relaxed max-w-2xl mx-auto"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -637,7 +675,7 @@ const Gallery = () => {
         </div>
       </motion.section>
 
-      <style jsx>{`
+      <style>{`
         @keyframes gradient-x {
           0%, 100% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }

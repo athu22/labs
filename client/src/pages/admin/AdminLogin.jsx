@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import { auth, db } from '../../services/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { supabase } from '../../services/supabase';
 import {
   Mail,
   Key,
@@ -33,19 +31,31 @@ const AdminLogin = () => {
     setError('');
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        if (userData.role === 'admin' || userData.role === 'super-admin') {
-          login(userCredential.user, userData);
-          navigate('/admin');
+      if (authError) throw authError;
+
+      const { data: userDoc, error: docError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', authData.user.id)
+        .single();
+
+      if (docError && docError.code !== 'PGRST116') throw docError;
+
+      if (userDoc) {
+        if (userDoc.role === 'admin' || userDoc.role === 'super-admin') {
+          login(authData.user, userDoc);
+          navigate('/admin', { replace: true });
         } else {
-          await auth.signOut();
+          await supabase.auth.signOut();
           setError('Access Denied: Insufficient privilege level.');
         }
       } else {
+        await supabase.auth.signOut();
         setError('Administrator node not found in registry.');
       }
     } catch (err) {

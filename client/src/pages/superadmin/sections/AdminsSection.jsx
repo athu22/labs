@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { db, firebaseConfig } from '../../../services/firebase';
-import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, setDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { Shield, Plus, Trash2, Mail, UserPlus, Loader2, Key, Edit2, X, Check } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../../../services/supabase';
+import { 
+  Shield, Plus, Trash2, Mail, UserPlus, Loader2, Key, Edit2, X, Check,
+  MapPin, Search, CheckCircle2, AlertCircle, Building2, UserCheck, ShieldCheck
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const AdminsSection = ({ admins, refresh }) => {
+const AdminsSection = ({ admins = [], refresh }) => {
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminDistrict, setNewAdminDistrict] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const districts = [
     'Ahmednagar', 'Akola', 'Amravati', 'Beed', 'Bhandara', 'Buldhana', 
@@ -32,33 +35,47 @@ const AdminsSection = ({ admins, refresh }) => {
     setAdding(true);
     
     try {
-      // We use a secondary Firebase app instance to create the user in Auth
-      // This prevents the current Super Admin from being signed out
-      let secondaryApp;
-      const appName = "SecondaryApp_" + Date.now();
-      
-      secondaryApp = initializeApp(firebaseConfig, appName);
-      const secondaryAuth = getAuth(secondaryApp);
+      const tempSupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        }
+      );
 
-      // 1. Create the user in Firebase Authentication
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newAdminEmail, newAdminPassword);
-      const uid = userCredential.user.uid;
+      // 1. Create the user in Supabase Auth
+      const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+        email: newAdminEmail,
+        password: newAdminPassword,
+      });
 
-      // 2. Create the user document in Firestore using the Auth UID
+      if (authError) throw authError;
+
+      const user = authData?.user;
+      if (!user?.id) {
+        throw new Error('Failed to create user in Supabase Auth.');
+      }
+      if (user.identities && user.identities.length === 0) {
+        throw new Error('This email is already registered.');
+      }
+
+      // 2. Create the user record in Supabase `users` table
       const nextId = (admins.length + 1).toString();
-      
-      await setDoc(doc(db, 'users', uid), {
-        uid: uid,
+      const { error: dbError } = await supabase.from('users').insert([{
+        auth_id: user.id,
         email: newAdminEmail,
         role: 'admin',
         adminId: nextId,
         district: newAdminDistrict,
-        createdAt: serverTimestamp()
-      });
+        created_at: new Date().toISOString()
+      }]);
 
-      // 3. Cleanup secondary app
-      await deleteApp(secondaryApp);
-      
+      if (dbError) throw dbError;
+
       setNewAdminEmail('');
       setNewAdminPassword('');
       setNewAdminDistrict('');
@@ -67,9 +84,12 @@ const AdminsSection = ({ admins, refresh }) => {
     } catch (e) {
       console.error(e);
       let errorMsg = 'Error creating administrator. ';
-      if (e.code === 'auth/email-already-in-use') errorMsg += 'This email is already registered.';
-      else if (e.code === 'auth/weak-password') errorMsg += 'Password should be at least 6 characters.';
-      else errorMsg += e.message;
+      const msg = (e.message || '').toLowerCase();
+      if (msg.includes('already registered') || msg.includes('already exists') || e.code === '23505') {
+        errorMsg += 'An account with this email address already exists.';
+      } else {
+        errorMsg += e.message || 'Please check the console for details.';
+      }
       alert(errorMsg);
     } finally {
       setAdding(false);
@@ -84,9 +104,12 @@ const AdminsSection = ({ admins, refresh }) => {
     
     setAdding(true);
     try {
-      await updateDoc(doc(db, 'users', editingAdmin.id), {
-        district: newAdminDistrict
-      });
+      const { error } = await supabase
+        .from('users')
+        .update({ district: newAdminDistrict })
+        .eq('id', editingAdmin.id);
+
+      if (error) throw error;
       
       setNewAdminEmail('');
       setNewAdminDistrict('');
@@ -105,7 +128,7 @@ const AdminsSection = ({ admins, refresh }) => {
     setEditingAdmin(admin);
     setNewAdminEmail(admin.email);
     setNewAdminDistrict(admin.district || '');
-    setNewAdminPassword(''); // We don't edit password here
+    setNewAdminPassword('');
   };
 
   const cancelEdit = () => {
@@ -117,166 +140,340 @@ const AdminsSection = ({ admins, refresh }) => {
 
   const removeAdmin = async (id) => {
     if (confirm('Permanently revoke this user\'s administrative access?')) {
-      await deleteDoc(doc(db, 'users', id));
-      refresh();
+      try {
+        const { error } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        refresh();
+      } catch (e) {
+        console.error(e);
+        alert('Error revoking administrator access.');
+      }
     }
   };
 
+  const filteredAdmins = admins.filter((a) => {
+    const s = searchTerm.toLowerCase();
+    return (
+      !searchTerm ||
+      a.email?.toLowerCase().includes(s) ||
+      a.district?.toLowerCase().includes(s) ||
+      a.adminId?.toString().includes(s)
+    );
+  });
+
+  const coveredDistricts = new Set(admins.map((a) => (a.district || '').trim()).filter(Boolean));
+
   return (
-    <div className="space-y-10 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* Section Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-8">
-        <div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Shield className="text-primary-600" size={24} /> 
-            Privilege Management
-          </h2>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Manage system administrators and access levels</p>
-        </div>
-      </div>
+      {/* 1. Header & KPI Cards */}
+      <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center shadow-sm">
+                <Shield size={20} />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                  District Administrator Access & Privileges
+                </h2>
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-0.5">
+                  Manage Regional District Admins for Maharashtra Clinical Association
+                </p>
+              </div>
+            </div>
+          </div>
 
-      <div className="grid lg:grid-cols-12 gap-10">
-        
-        {/* Registration Form */}
-        <div className="lg:col-span-4">
-          <div className="bg-slate-50/50 border border-slate-200 rounded-2xl p-6 sticky top-0">
-             <div className="flex items-center gap-2 mb-6">
-                <div className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-primary-600">
-                   {editingAdmin ? <Edit2 size={16} /> : <UserPlus size={16} />}
-                </div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
-                  {editingAdmin ? 'Update Admin' : 'Provision Admin'}
-                </h3>
-             </div>
-             
-             <div className="space-y-5">
-               <div className="space-y-2">
-                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Identity</label>
-                 <div className="relative">
-                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-                   <input
-                     type="email"
-                     placeholder="admin@aclap.org"
-                     disabled={!!editingAdmin}
-                     value={newAdminEmail}
-                     onChange={(e) => setNewAdminEmail(e.target.value)}
-                     className="w-full bg-white disabled:bg-slate-50 disabled:text-slate-400 border border-slate-200 rounded-xl py-2.5 pl-9 pr-4 text-xs font-bold text-slate-900 outline-none focus:border-primary-600 transition-all shadow-sm"
-                   />
-                 </div>
-               </div>
-
-               <div className="space-y-2">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned District</label>
-                  <select
-                    value={newAdminDistrict}
-                    onChange={(e) => setNewAdminDistrict(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl py-2.5 px-4 text-xs font-bold text-slate-900 outline-none focus:border-primary-600 transition-all shadow-sm"
-                  >
-                    <option value="">Select District</option>
-                    {districts.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-               </div>
-
-                {!editingAdmin && (
-                  <div className="space-y-2">
-                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Master Password</label>
-                    <div className="relative">
-                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={newAdminPassword}
-                        onChange={(e) => setNewAdminPassword(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-9 pr-10 text-xs font-bold text-slate-900 outline-none focus:border-primary-600 transition-all shadow-sm"
-                      />
-                      <button
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors"
-                      >
-                        {showPassword ? <Shield size={14} /> : <Key size={14} />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-3 mt-2">
-                  <button
-                    onClick={editingAdmin ? updateAdmin : addAdmin}
-                    disabled={adding}
-                    className="w-full bg-primary-600 hover:bg-primary-700 text-white py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary-600/10 active:scale-95 disabled:opacity-50"
-                  >
-                    {adding ? <Loader2 className="animate-spin" size={14} /> : (editingAdmin ? <Check size={14} /> : <Plus size={14} />)} 
-                    {editingAdmin ? 'Save Changes' : 'Authorize Node'}
-                  </button>
-                  {editingAdmin && (
-                    <button
-                      onClick={cancelEdit}
-                      className="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <X size={14} /> Cancel Edit
-                    </button>
-                  )}
-                </div>
-             </div>
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-xs font-black">
+              {admins.length} Active Regional Admins
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-black">
+              {coveredDistricts.size} / 36 Districts Assigned
+            </span>
           </div>
         </div>
 
-        {/* Admin List */}
-        <div className="lg:col-span-8 space-y-6">
-           <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Active Administrator Directory</h3>
-              <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{admins.length} Nodes</span>
-           </div>
+        {/* 3 Metric Pills */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6">
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-primary-100/60 text-primary-700 flex items-center justify-center font-black">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Admins</p>
+              <h4 className="text-xl font-black text-slate-900 font-mono">{admins.length + 1} Nodes</h4>
+            </div>
+          </div>
 
-           <div className="grid gap-4">
-             {admins.map(admin => (
-               <div key={admin.id} className="group bg-white border border-slate-200 p-4 rounded-2xl flex items-center justify-between transition-all hover:border-primary-200 hover:shadow-sm">
-                 <div className="flex items-center gap-4">
-                   <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-primary-600 group-hover:bg-primary-50 transition-colors">
-                     <Shield size={18} />
-                   </div>
-                   <div>
-                     <div className="text-sm font-black text-slate-800 tracking-tight">{admin.email}</div>
-                     <div className="flex items-center gap-3 mt-1">
-                       <div className="flex items-center gap-1.5">
-                         <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                         <span className="text-[9px] text-slate-400 font-black uppercase tracking-widest">{admin.adminId || 'N/A'}</span>
-                       </div>
-                       <div className="text-[9px] font-black text-primary-600 bg-primary-50 px-2 py-0.5 rounded-md uppercase tracking-widest">
-                         {admin.district || 'All Districts'}
-                       </div>
-                     </div>
-                   </div>
-                 </div>
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100/60 text-emerald-700 flex items-center justify-center font-black">
+              <MapPin size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Districts Covered</p>
+              <h4 className="text-xl font-black text-slate-900 font-mono">{coveredDistricts.size} Districts</h4>
+            </div>
+          </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => startEdit(admin)}
-                      className="p-2 text-slate-300 hover:text-primary-600 hover:bg-primary-50 transition-all rounded-lg opacity-0 group-hover:opacity-100"
-                      title="Edit Profile"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => removeAdmin(admin.id)}
-                      className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all rounded-lg opacity-0 group-hover:opacity-100"
-                      title="Revoke Access"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-               </div>
-             ))}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-100/60 text-amber-700 flex items-center justify-center font-black">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Open Districts</p>
+              <h4 className="text-xl font-black text-slate-900 font-mono">{36 - coveredDistricts.size} Districts</h4>
+            </div>
+          </div>
+        </div>
+      </div>
 
-             {admins.length === 0 && (
-               <div className="py-20 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                 <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] italic">No secondary administrators found</p>
-               </div>
-             )}
-           </div>
+      {/* 2. Main 2-Column Split: Provision Form (Left) & Directory (Right) */}
+      <div className="grid lg:grid-cols-12 gap-6 items-start">
+        
+        {/* Left Column: Provision Administrator Card */}
+        <div className="lg:col-span-5 bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm sticky top-20">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 font-black">
+                {editingAdmin ? <Edit2 size={16} /> : <UserPlus size={16} />}
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  {editingAdmin ? 'Edit Administrator Node' : 'Provision New District Admin'}
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium">Assign access role & district territory</p>
+              </div>
+            </div>
+
+            {editingAdmin && (
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="text-[10px] font-black uppercase text-slate-400 hover:text-slate-700 px-2 py-1 bg-slate-100 rounded-lg"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
+                Admin Email Identity *
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="email"
+                  placeholder="admin.pune@aclap.org"
+                  disabled={Boolean(editingAdmin)}
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  className="w-full bg-slate-50 disabled:bg-slate-100 disabled:text-slate-500 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary-600 transition-all shadow-inner"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
+                Assigned Territory (District) *
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <select
+                  value={newAdminDistrict}
+                  onChange={(e) => setNewAdminDistrict(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary-600 transition-all cursor-pointer shadow-inner"
+                >
+                  <option value="">Select Maharashtra District / जिल्हा निवडा *</option>
+                  {districts.map((d) => (
+                    <option key={d} value={d}>
+                      {d} {coveredDistricts.has(d) ? ' (Currently Assigned)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!editingAdmin && (
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">
+                  Initial Master Password *
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Min 6 characters password"
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 pl-10 pr-10 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary-600 transition-all shadow-inner"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showPassword ? <Shield size={14} /> : <Key size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3.5 bg-indigo-50/60 border border-indigo-100 rounded-2xl text-[11px] text-indigo-900 space-y-1 mt-2">
+              <p className="font-black uppercase tracking-wider text-[10px] text-primary-700">
+                District Administrator Permissions:
+              </p>
+              <p className="leading-relaxed text-slate-600 text-[10px]">
+                Can review event cash payments for their district (Stage 1 Cash Approval), verify registered clinical members, and manage local registrations.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={editingAdmin ? updateAdmin : addAdmin}
+                disabled={adding}
+                className="w-full bg-primary-600 hover:bg-primary-500 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md shadow-primary-600/30 active:scale-95 disabled:opacity-50"
+              >
+                {adding ? (
+                  <>
+                    <Loader2 className="animate-spin" size={15} /> Authorizing Node...
+                  </>
+                ) : editingAdmin ? (
+                  <>
+                    <Check size={15} /> Save Territory Changes
+                  </>
+                ) : (
+                  <>
+                    <Plus size={15} /> Authorize District Admin
+                  </>
+                )}
+              </button>
+
+              {editingAdmin && (
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all"
+                >
+                  Cancel Edit
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
+        {/* Right Column: Active Administrator Directory */}
+        <div className="lg:col-span-7 bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-7 shadow-sm space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Active Administrator Directory
+              </h3>
+              <p className="text-[10px] text-slate-400 font-medium">Authorized credentials and district delegations</p>
+            </div>
+
+            <div className="relative max-w-xs w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+              <input
+                type="text"
+                placeholder="Search by email or district..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pl-9 pr-3 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-primary-600"
+              />
+            </div>
+          </div>
+
+          {/* Master Super Admin Card (Always present) */}
+          <div className="p-4 bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-2xl flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-primary-600 text-white flex items-center justify-center font-black text-sm shadow-md">
+                SA
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs font-black tracking-tight text-white">admin@aclap.org</h4>
+                  <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider bg-primary-500 text-white">
+                    Master Root
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300 font-medium mt-0.5">
+                  Supreme Oversight • All 36 Districts • Final Cash Ticket Issuance
+                </p>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-400 font-black uppercase">Active Root</span>
+          </div>
+
+          {/* Regional District Admins List */}
+          <div className="space-y-3">
+            {filteredAdmins.map((admin) => (
+              <div
+                key={admin.id}
+                className="group p-4 bg-slate-50/70 hover:bg-white border border-slate-200/90 hover:border-primary-300 hover:shadow-md rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-primary-600 font-black text-xs shrink-0 shadow-sm">
+                    {admin.district?.slice(0, 2).toUpperCase() || 'DA'}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-black text-slate-900 tracking-tight">{admin.email}</p>
+                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-slate-400 font-mono">
+                        #ID-{admin.adminId || '0'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-primary-700 bg-primary-50 px-2.5 py-0.5 rounded-md border border-primary-100">
+                        <MapPin size={10} /> {admin.district || 'All Districts'} District
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Node
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(admin)}
+                    className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all border border-transparent hover:border-primary-200"
+                    title="Change District Territory"
+                  >
+                    <Edit2 size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeAdmin(admin.id)}
+                    className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all border border-transparent hover:border-rose-200"
+                    title="Revoke Admin Access"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {filteredAdmins.length === 0 && (
+              <div className="py-16 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                <UserCheck size={28} className="mx-auto text-slate-300 mb-2" />
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                  No district administrators match your query
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

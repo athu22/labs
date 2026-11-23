@@ -7,7 +7,24 @@ const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Dev-Root-Email', 'X-Dev-Root-Uid'],
+  })
+);
+app.options('*', cors());
+
+// Razorpay Webhook requires raw request body for HMAC signature verification
+const { handleRazorpayWebhook } = require('./controllers/eventPaymentController');
+app.post(
+  '/api/events/webhook/razorpay',
+  express.raw({ type: 'application/json' }),
+  handleRazorpayWebhook
+);
+
 app.use(express.json());
 app.use(morgan('dev'));
 app.use(express.urlencoded({ extended: true }));
@@ -16,10 +33,12 @@ app.use(express.urlencoded({ extended: true }));
 const registrationRoutes = require('./routes/registrationRoutes');
 const setupRoutes = require('./routes/setupRoutes');
 const accountingRoutes = require('./routes/accountingRoutes');
+const eventRoutes = require('./routes/eventRoutes');
 
 app.use('/api/registrations', registrationRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/accounting', accountingRoutes);
+app.use('/api/events', eventRoutes);
 
 // Basic Route
 app.get('/', (req, res) => {

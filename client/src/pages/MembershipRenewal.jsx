@@ -3,8 +3,7 @@ import { CreditCard, Calendar, ShieldCheck, AlertCircle, Loader2, CheckCircle2, 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { LanguageContext } from '../context/LanguageContext';
-import { db } from '../services/firebase';
-import { collection, query, where, getDocs, addDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { supabase } from '../services/supabase';
 import { Link } from 'react-router-dom';
 
 // Translations for Membership Renewal
@@ -147,25 +146,39 @@ const MembershipRenewal = () => {
     setLoading(true);
     try {
       // Find the approved registration for this user's email
-      const q = query(
-        collection(db, 'registrations'),
-        where('email', '==', currentUser.email),
-        where('status', '==', 'approved')
-      );
-      const snap = await getDocs(q);
+      const { data: regData, error: regErr } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('email', currentUser.email)
+        .eq('status', 'approved')
+        .limit(1);
 
-      if (!snap.empty) {
-        const data = { id: snap.docs[0].id, ...snap.docs[0].data() };
+      if (regErr) throw regErr;
+
+      if (regData && regData.length > 0) {
+        const r = regData[0];
+        const data = {
+          ...r,
+          fullName: r.fullName || r.full_name || '',
+          membershipId: r.membershipId || r.registration_no || r.id,
+          expiryDate: r.expiryDate || r.expiry_date,
+        };
         setMembership(data);
 
         // Fetch renewal history
-        const hq = query(
-          collection(db, 'renewals'),
-          where('registrationId', '==', snap.docs[0].id),
-          orderBy('submittedAt', 'desc')
-        );
-        const hSnap = await getDocs(hq);
-        setRenewalHistory(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const { data: historyData, error: histErr } = await supabase
+          .from('renewals')
+          .select('*')
+          .eq('registration_id', r.id)
+          .order('submitted_at', { ascending: false });
+
+        if (!histErr && historyData) {
+          setRenewalHistory(historyData.map(h => ({
+            ...h,
+            upiTransactionId: h.upiTransactionId || h.transaction_id,
+            paymentDate: h.paymentDate || h.payment_date,
+          })));
+        }
       }
     } catch (e) {
       console.error(e);
@@ -178,15 +191,22 @@ const MembershipRenewal = () => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await addDoc(collection(db, 'renewals'), {
-        registrationId: membership.id,
-        memberEmail: currentUser.email,
-        memberName: membership.fullName,
-        membershipId: membership.membershipId,
-        ...formData,
+      const rawUid = currentUser?.id || currentUser?.uid;
+      const isUuid =
+        typeof rawUid === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawUid);
+
+      const { error } = await supabase.from('renewals').insert([{
+        registration_id: membership.id,
+        uid: isUuid ? rawUid : null,
+        member_name: membership.fullName,
+        email: currentUser.email,
+        transaction_id: formData.upiTransactionId,
+        payment_date: formData.paymentDate,
         status: 'pending',
-        submittedAt: serverTimestamp(),
-      });
+        submitted_at: new Date().toISOString(),
+      }]);
+      if (error) throw error;
       setSuccess(true);
     } catch (e) {
       console.error(e);
