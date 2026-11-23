@@ -15,7 +15,6 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Dev-Root-Email', 'X-Dev-Root-Uid'],
   })
 );
-app.options('*', cors());
 
 // Razorpay Webhook requires raw request body for HMAC signature verification
 const { handleRazorpayWebhook } = require('./controllers/eventPaymentController');
